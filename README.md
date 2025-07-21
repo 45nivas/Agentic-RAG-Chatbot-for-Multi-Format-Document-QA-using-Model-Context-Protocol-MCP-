@@ -22,12 +22,19 @@ An intelligent chatbot that can answer questions about your documents using AI. 
    ```bash
    pip install -r requirements.txt
    ```
-3. Run the application:
+3. **Set up your API key securely:**
+   ```bash
+   # Create a .env file in the project root
+   echo "GEMINI_API_KEY=your_actual_api_key_here" > .env
+   ```
+   Replace `your_actual_api_key_here` with your Google Gemini API key.
+
+4. Run the application:
    ```bash
    streamlit run ui/app.py
    ```
-4. Open your browser to `http://localhost:8501`
-5. Upload documents and start asking questions!
+5. Open your browser to `http://localhost:8501`
+6. Upload documents and start asking questions!
 
 ## How it works
 The system uses a multi-agent architecture where different components handle specific tasks:
@@ -93,6 +100,8 @@ User: "What KPIs were tracked in Q1?"
 - Larger documents may take a moment to process initially  
 - The system works best with text-heavy documents (PDFs with images may have limited text extraction)
 
----
-
-We're looking forward to seeing your creativity and problem-solving in action. Good luck and happy coding!
+## Security
+- **API Key Protection**: This project uses environment variables to securely store API keys
+- **Never commit API keys**: The `.env` file is excluded from version control via `.gitignore`
+- **Environment Setup**: Always use the `.env` file for sensitive configuration
+- **Production Deployment**: Use proper secret management in production environments
