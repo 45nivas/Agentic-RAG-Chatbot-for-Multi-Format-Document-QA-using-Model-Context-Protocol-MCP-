@@ -61,8 +61,19 @@ if prompt := st.chat_input("Ask about your documents"):
                 
                 # Call Gemini
                 try:
+                    import os
                     import google.generativeai as genai
-                    genai.configure(api_key="AIzaSyCgRmst1xIMP_N9EJyQjrSwSIYRn_kDcWs")
+                    from dotenv import load_dotenv
+                    
+                    # Load environment variables
+                    load_dotenv()
+                    api_key = os.getenv("GEMINI_API_KEY")
+                    
+                    if not api_key:
+                        st.error("GEMINI_API_KEY not found in environment variables. Please check your .env file.")
+                        st.stop()
+                    
+                    genai.configure(api_key=api_key)
                     model = genai.GenerativeModel("gemini-1.5-flash")  # Updated model name
                     
                     full_prompt = f"Context: {context}\n\nQuestion: {prompt}\n\nAnswer:"
