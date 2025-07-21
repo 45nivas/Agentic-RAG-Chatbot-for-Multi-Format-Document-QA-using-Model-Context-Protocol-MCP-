@@ -1,11 +1,7 @@
-"""
-Document parsing utilities for multi-format support: PDF, CSV, PPTX, DOCX, TXT, MD.
-"""
 import os
 from typing import List
 
 def chunk_text(text: str, chunk_size: int = 500) -> List[str]:
-    """Simple chunking by character length."""
     if not text or not text.strip():
         return []
     return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size) if text[i:i+chunk_size].strip()]

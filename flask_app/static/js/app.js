@@ -202,7 +202,7 @@ async function sendMessage() {
         removeTypingIndicator(typingId);
         
         if (result.success) {
-            addMessage('bot', result.response);
+            addMessage('bot', result.response, result.source_context);
         } else {
             addMessage('bot', result.error || 'Sorry, I encountered an error while processing your question.');
         }
@@ -216,7 +216,7 @@ async function sendMessage() {
 }
 
 // Add message to chat
-function addMessage(sender, content) {
+function addMessage(sender, content, sourceContext = null) {
     const messageDiv = document.createElement('div');
     messageDiv.classList.add('message', sender, 'fade-in');
     
@@ -230,6 +230,26 @@ function addMessage(sender, content) {
     // Format content (basic markdown support)
     const formattedContent = formatMessage(content);
     contentDiv.innerHTML = formattedContent;
+    
+    // Add source context if available (for bot messages)
+    if (sender === 'bot' && sourceContext && sourceContext.length > 0) {
+        const sourceDiv = document.createElement('div');
+        sourceDiv.classList.add('source-context');
+        sourceDiv.innerHTML = `
+            <details class="source-details">
+                <summary class="source-summary">📋 View Source Context (${sourceContext.length} chunks)</summary>
+                <div class="source-list">
+                    ${sourceContext.map((context, index) => `
+                        <div class="source-item">
+                            <strong>Chunk ${index + 1}:</strong> 
+                            <span class="source-text">${context.length > 200 ? context.substring(0, 200) + '...' : context}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </details>
+        `;
+        contentDiv.appendChild(sourceDiv);
+    }
     
     messageDiv.appendChild(avatar);
     messageDiv.appendChild(contentDiv);

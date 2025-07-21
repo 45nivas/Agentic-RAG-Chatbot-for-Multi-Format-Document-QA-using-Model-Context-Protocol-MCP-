@@ -1,15 +1,10 @@
-"""
-LLM utilities for Google Gemini API integration.
-"""
 import os
 from typing import List
 import google.generativeai as genai
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
-# Get API key from environment variable
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if not GEMINI_API_KEY:

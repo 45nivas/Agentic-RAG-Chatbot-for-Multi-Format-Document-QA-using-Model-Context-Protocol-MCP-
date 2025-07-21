@@ -1,6 +1,3 @@
-"""
-Model Context Protocol (MCP) message structure and utilities.
-"""
 from dataclasses import dataclass, field
 from typing import Any, Dict
 import uuid
@@ -14,7 +11,6 @@ class MCPMessage:
     payload: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self):
-        """Convert MCPMessage to dictionary."""
         return {
             "sender": self.sender,
             "receiver": self.receiver,
@@ -25,7 +21,6 @@ class MCPMessage:
 
     @staticmethod
     def from_dict(data: Dict[str, Any]):
-        """Create MCPMessage from dictionary."""
         return MCPMessage(
             sender=data["sender"],
             receiver=data["receiver"],

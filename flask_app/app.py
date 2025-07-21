@@ -1,7 +1,3 @@
-"""
-Flask web application for Agentic RAG Chatbot
-Professional UI inspired by SLRIS design
-"""
 from flask import Flask, render_template, request, jsonify, session
 import os
 import sys
@@ -10,20 +6,20 @@ import logging
 from datetime import datetime
 from werkzeug.utils import secure_filename
 import tempfile
+from dotenv import load_dotenv
 
-# Add parent directory to path for agent imports
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from agents.coordinator_agent import CoordinatorAgent
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-change-in-production'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Configure upload folder
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'pptx', 'csv', 'txt', 'md'}
 
@@ -37,7 +33,6 @@ def allowed_file(filename):
 
 @app.route('/')
 def index():
-    """Main page with upload and chat interface"""
     if 'conversation' not in session:
         session['conversation'] = []
     if 'uploaded_files' not in session:
@@ -46,7 +41,6 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload_files():
-    """Handle file uploads"""
     try:
         if 'files' not in request.files:
             return jsonify({'error': 'No files selected'}), 400
@@ -59,12 +53,10 @@ def upload_files():
                 continue
             
             if file and allowed_file(file.filename):
-                # Generate unique filename
                 filename = secure_filename(file.filename)
                 unique_filename = f"{uuid.uuid4()}_{filename}"
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
                 
-                # Save file
                 file.save(filepath)
                 uploaded_files.append({
                     'filename': filename,
@@ -74,7 +66,6 @@ def upload_files():
         if not uploaded_files:
             return jsonify({'error': 'No valid files uploaded'}), 400
         
-        # Store in session
         session['uploaded_files'] = uploaded_files
         session.modified = True
         
@@ -89,7 +80,6 @@ def upload_files():
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    """Handle chat messages"""
     try:
         data = request.get_json()
         user_message = data.get('message', '').strip()
@@ -97,30 +87,32 @@ def chat():
         if not user_message:
             return jsonify({'error': 'Message cannot be empty'}), 400
         
-        # Check if files are uploaded
         uploaded_files = session.get('uploaded_files', [])
         if not uploaded_files:
             return jsonify({'error': 'Please upload documents first'}), 400
         
-        # Process with coordinator agent
         coordinator = CoordinatorAgent()
         file_paths = [f['filepath'] for f in uploaded_files]
         
-        # Get agent responses
-        messages = coordinator.process(file_paths, user_message)
+        try:
+            messages = coordinator.process(file_paths, user_message)
+        except Exception as api_error:
+            logger.error(f"API error in coordinator: {str(api_error)}")
+            if "API" in str(api_error) or "network" in str(api_error).lower():
+                return jsonify({'error': 'Network or API error. Please check your internet connection and try again.'}), 500
+            else:
+                return jsonify({'error': f'Processing error: {str(api_error)}'}), 500
         
         if len(messages) >= 3:
             ingest_msg = messages[0]
             retrieval_msg = messages[1] 
             llm_msg = messages[2]
             
-            # Extract information
             chunks_found = len(ingest_msg.payload.get("chunks", []))
             context_found = len(retrieval_msg.payload.get("retrieved_context", []))
             answer = llm_msg.payload.get("answer", "Sorry, I couldn't generate an answer.")
             source_context = retrieval_msg.payload.get("retrieved_context", [])
             
-            # Store conversation in session
             conversation = session.get('conversation', [])
             conversation.append({
                 'user': user_message,
@@ -128,7 +120,7 @@ def chat():
                 'metadata': {
                     'chunks_found': chunks_found,
                     'context_found': context_found,
-                    'source_context': source_context[:3]  # Limit to first 3 chunks
+                    'source_context': source_context[:3]
                 }
             })
             session['conversation'] = conversation
@@ -136,7 +128,7 @@ def chat():
             
             return jsonify({
                 'success': True,
-                'answer': answer,
+                'response': answer,
                 'metadata': {
                     'chunks_found': chunks_found,
                     'context_found': context_found,
@@ -148,20 +140,18 @@ def chat():
             return jsonify({'error': 'Processing incomplete. Please try again.'}), 500
             
     except Exception as e:
+        logger.error(f"Chat processing failed: {str(e)}")
         return jsonify({'error': f'Chat processing failed: {str(e)}'}), 500
 
 @app.route('/clear', methods=['POST'])
 def clear_conversation():
-    """Clear conversation and uploaded files"""
     try:
-        # Clean up uploaded files
         uploaded_files = session.get('uploaded_files', [])
         for file_info in uploaded_files:
             filepath = file_info.get('filepath')
             if filepath and os.path.exists(filepath):
                 os.remove(filepath)
         
-        # Clear session
         session['conversation'] = []
         session['uploaded_files'] = []
         session.modified = True
@@ -173,7 +163,6 @@ def clear_conversation():
 
 @app.route('/health')
 def health():
-    """Health check endpoint"""
     try:
         has_files = 'uploaded_files' in session and len(session['uploaded_files']) > 0
         return jsonify({
@@ -188,11 +177,9 @@ def health():
 
 @app.route('/favicon.ico')
 def favicon():
-    """Serve favicon"""
     try:
         return app.send_static_file('favicon.ico')
     except:
-        # Return empty response if favicon doesn't exist
         return '', 204
 
 if __name__ == '__main__':

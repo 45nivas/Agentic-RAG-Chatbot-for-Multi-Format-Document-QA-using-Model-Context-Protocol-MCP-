@@ -1,6 +1,3 @@
-"""
-IngestionAgent: Parses, cleans, and chunkifies documents of various formats.
-"""
 from dataclasses import dataclass
 from typing import List, Dict, Any
 from .mcp import MCPMessage
@@ -14,9 +11,6 @@ class IngestionAgent:
         self.supported_formats = ["pdf", "csv", "pptx", "docx", "txt", "md"]
 
     def parse_documents(self, file_paths: List[str]) -> MCPMessage:
-        """
-        Parses and chunkifies documents, returns MCPMessage with chunks.
-        """
         all_chunks = []
         for path in file_paths:
             chunks = parse_document(path)
@@ -27,12 +21,3 @@ class IngestionAgent:
             type="CHUNKIFY_RESULT",
             payload={"chunks": all_chunks, "file_paths": file_paths}
         )
-
-# Example MCP message
-# {
-#   "sender": "IngestionAgent",
-#   "receiver": "RetrievalAgent",
-#   "type": "CHUNKIFY_RESULT",
-#   "trace_id": "...",
-#   "payload": {"chunks": ["..."], "file_paths": ["..."]}
-# }

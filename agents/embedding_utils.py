@@ -1,6 +1,3 @@
-"""
-Embedding utilities using HuggingFace transformers and ChromaDB.
-"""
 from typing import List
 from sentence_transformers import SentenceTransformer
 import chromadb
@@ -11,13 +8,10 @@ class EmbeddingStore:
         self.model = SentenceTransformer(model_name)
         self.chroma_client = chromadb.Client()
         
-        # Create a unique collection name for each session to avoid conflicts
         collection_name = f"rag_docs_{int(time.time())}"
         try:
-            # Always create a fresh collection
             self.collection = self.chroma_client.create_collection(name=collection_name)
         except:
-            # If creation fails, try to get existing collection
             self.collection = self.chroma_client.get_collection(name=collection_name)
         self.chunk_ids = []
 
