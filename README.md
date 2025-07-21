@@ -203,4 +203,4 @@ The Flask application is production-ready with:
 
 ---
 
-**Built with ❤️ and inspired by SLRIS company's commitment to professional excellence and innovative design standards.**
+**This project was visually and structurally inspired by SLRIS's standards for professional design and user experience.**
