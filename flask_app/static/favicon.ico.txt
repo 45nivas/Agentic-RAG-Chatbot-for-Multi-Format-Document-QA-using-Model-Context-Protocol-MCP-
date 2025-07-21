@@ -1,0 +1,6 @@
+# Favicon Placeholder
+
+This is a placeholder for the favicon.ico file.
+In a real deployment, you would place an actual .ico file here.
+
+For now, the app will handle the favicon route gracefully if the file doesn't exist.

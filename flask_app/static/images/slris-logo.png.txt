@@ -1,0 +1,13 @@
+# SLRIS Logo Placeholder
+
+Since we don't have the actual SLRIS logo, the CSS is set up to display "SLRIS" text with a gradient background in the logo container.
+
+To add the actual logo:
+1. Replace this file with the actual SLRIS logo image (PNG format recommended)
+2. Update the filename in the HTML template if needed
+3. Ensure the image is approximately 40x40 pixels or adjust the CSS accordingly
+
+Current setup uses a CSS-generated logo with:
+- Blue gradient background (#1E90FF to #00bfff)
+- White "SLRIS" text
+- 40x40 pixel container with rounded corners

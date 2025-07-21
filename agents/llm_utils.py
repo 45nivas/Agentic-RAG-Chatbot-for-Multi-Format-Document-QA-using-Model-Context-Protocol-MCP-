@@ -1,10 +1,19 @@
 """
 LLM utilities for Google Gemini API integration.
 """
+import os
 from typing import List
 import google.generativeai as genai
+from dotenv import load_dotenv
 
-GEMINI_API_KEY = "AIzaSyCgRmst1xIMP_N9EJyQjrSwSIYRn_kDcWs"
+# Load environment variables from .env file
+load_dotenv()
+
+# Get API key from environment variable
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+if not GEMINI_API_KEY:
+    raise ValueError("GEMINI_API_KEY not found in environment variables. Please check your .env file.")
 
 class LLMClient:
     def __init__(self, model: str = "gemini-1.5-flash"):
