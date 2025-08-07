@@ -1,7 +1,7 @@
 # Agentic RAG Chatbot for Multi-Format Document QA
-## Smart Document Q&A Bot with SLRIS-Inspired Professional Interface
+## Smart Document Q&A Bot with Professional Interface
 
-An intelligent multi-agent chatbot that can answer questions about your documents using AI and Model Context Protocol (MCP). Upload PDFs, Word docs, PowerPoints and more - then ask questions and get instant answers through a professionally designed interface inspired by SLRIS company branding!
+An intelligent multi-agent chatbot that can answer questions about your documents using AI and Model Context Protocol (MCP). Upload PDFs, Word docs, PowerPoints and more - then ask questions and get instant answers through a professionally designed interface!
 
 ## What it does
 - **Multi-format document support**: PDF, DOCX, PPTX, CSV, TXT, Markdown
@@ -10,12 +10,12 @@ An intelligent multi-agent chatbot that can answer questions about your document
 - **Multi-turn conversations**: Context-aware chat that remembers previous questions
 - **Professional dual interface**: 
   - **Development UI**: Clean Streamlit interface for testing
-  - **Production UI**: Professional Flask web app with SLRIS-inspired design featuring authentic orange/black branding and corporate logo
+  - **Production UI**: Professional Flask web app with modern design featuring elegant orange/black branding
 
 ## Tech Stack
 - **Frontend & UI**: 
   - **Streamlit**: Optimized development interface with fast loading (2-3 seconds)
-  - **Flask**: Production web application with professional SLRIS-inspired branding
+  - **Flask**: Production web application with professional branding
   - **HTML/CSS/JavaScript**: Custom responsive design with corporate orange/black theme
 - **AI Engine**: Google Gemini 1.5 Flash (Large Language Model) with intelligent rate limiting
 - **Search System**: 
@@ -24,7 +24,7 @@ An intelligent multi-agent chatbot that can answer questions about your document
 - **Document Processing**: PyPDF2, python-docx, python-pptx, pandas
 - **Architecture**: Multi-agent system with Model Context Protocol (MCP)
 - **Security**: Environment variable configuration with python-dotenv
-- **Branding**: Professional SLRIS company-inspired design with authentic logo integration
+- **Branding**: Professional design with modern logo integration
 
 ## Quick Start
 
@@ -47,14 +47,14 @@ An intelligent multi-agent chatbot that can answer questions about your document
    ```
 5. Open your browser to `http://localhost:8501`
 
-### Option 2: Professional Flask Interface (SLRIS-Inspired)
+### Option 2: Professional Flask Interface
 1. Follow steps 1-3 above for setup
 2. Run the Flask application:
    ```bash
    python flask_app/app.py
    ```
 3. Open your browser to `http://localhost:5000`
-4. Experience the professional SLRIS-inspired interface with authentic branding and modern UI
+4. Experience the professional interface with modern branding and UI
 
 ### Start Chatting!
 6. Upload documents using the intuitive interface
@@ -90,11 +90,11 @@ All agents communicate through standardized MCP messages with trace IDs, ensurin
 ├── ui/                        # Optimized Streamlit interface (2-3s startup)
 │   └── app.py                 # Performance-optimized application with inline MCP
 ├── flask_app/                 # Professional production interface
-│   ├── app.py                 # Flask web application (SLRIS-inspired)
+│   ├── app.py                 # Flask web application
 │   ├── templates/
-│   │   └── index.html         # Professional HTML template with SLRIS branding
+│   │   └── index.html         # Professional HTML template with modern branding
 │   └── static/
-│       ├── css/styles.css     # SLRIS orange/black theme styling
+│       ├── css/styles.css     # Orange/black theme styling
 │       └── js/app.js          # Interactive frontend JavaScript
 ├── .env                       # Secure API key configuration
 ├── requirements.txt           # Python dependencies
@@ -110,14 +110,14 @@ User uploads: sales_review.pdf, metrics.csv
 User asks: "What KPIs were tracked in Q1?"
 ```
 
-**Complete message flow through professional SLRIS-inspired interface:**
+**Complete message flow through professional interface:**
 ```
-➡️ Professional UI (Flask/SLRIS design) forwards to CoordinatorAgent
+➡️ Professional UI (Flask design) forwards to CoordinatorAgent
 ➡️ CoordinatorAgent orchestrates the pipeline:
    🔸 IngestionAgent → parses documents → sends CHUNKIFY_RESULT
    🔸 RetrievalAgent → finds relevant chunks → sends RETRIEVAL_RESULT  
    🔸 LLMResponseAgent → formats prompt & calls Gemini → sends LLM_ANSWER
-➡️ Professional chatbot displays answer with source context in SLRIS-branded interface
+➡️ Professional chatbot displays answer with source context in modern interface
 ```
 
 **MCP message example:**
@@ -136,8 +136,8 @@ User asks: "What KPIs were tracked in Q1?"
 
 ## Interface Features
 
-### Professional Flask Interface (SLRIS-Inspired)
-- **Authentic SLRIS branding** with orange/black corporate theme and real company logo
+### Professional Flask Interface
+- **Modern branding** with orange/black corporate theme and professional logo
 - **Modern UX** with drag-and-drop uploads, real-time chat, and responsive design
 - **Source context display** showing document chunks for answer verification
 - **Production-ready** with session management and error handling
@@ -202,7 +202,7 @@ User asks: "What KPIs were tracked in Q1?"
 
 ### Production Deployment
 The Flask application is production-ready with:
-- **Professional SLRIS branding** for corporate environments
+- **Professional branding** for corporate environments
 - **Secure file handling** and session management
 - **Error handling** and logging for monitoring
 - **Responsive design** for various devices
@@ -218,7 +218,7 @@ The Flask application is production-ready with:
 - **Performance optimization**: 93% startup time reduction (30s → 2-3s)
 
 ### 🎨 **Professional Design**
-- **SLRIS-inspired branding** with authentic company colors and logo
+- **Modern branding** with authentic company colors and logo
 - **Dual interface strategy**: Development (Streamlit) + Production (Flask)
 - **Modern UI/UX** with drag-and-drop functionality and real-time chat
 - **Responsive design** optimized for all devices
@@ -232,4 +232,4 @@ The Flask application is production-ready with:
 
 ---
 
-**This project was visually and structurally inspired by SLRIS's standards for professional design and user experience.**
+**This project features professional design standards for modern user experience.**
