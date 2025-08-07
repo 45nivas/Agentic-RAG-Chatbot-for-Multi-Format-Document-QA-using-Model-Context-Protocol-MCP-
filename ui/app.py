@@ -7,12 +7,12 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
-# Setup page
+
 st.set_page_config(page_title="🤖 RAG Document Chatbot", layout="wide")
 st.title("🤖 Smart Document Q&A Bot")
 st.markdown("Upload documents and ask questions about them!")
 
-# Simple MCP Message class (no external dependencies)
+
 @dataclass
 class MCPMessage:
     sender: str
@@ -40,9 +40,9 @@ def extract_text_simple(uploaded_files):
             else:
                 file_content = f"[{file.name} - File type not supported]"
             
-            # Simple chunking - split by paragraphs
+           
             chunks = [chunk.strip() for chunk in file_content.split('\n\n') if chunk.strip()]
-            all_chunks.extend(chunks[:10])  # Limit to 10 chunks per file for speed
+            all_chunks.extend(chunks[:10])  
         except:
             continue
     
@@ -59,7 +59,7 @@ def simple_retrieval(chunks, query, top_k=3):
         if score > 0:
             scored_chunks.append((score, chunk))
     
-    # Sort by score and return top chunks
+   
     scored_chunks.sort(reverse=True, key=lambda x: x[0])
     return [chunk for score, chunk in scored_chunks[:top_k]]
 
@@ -68,7 +68,7 @@ def process_with_agents(uploaded_files, prompt):
     trace_id = str(uuid.uuid4())[:8]
     
     try:
-        # Step 1: Ingestion Agent (FAST)
+ 
         chunks = extract_text_simple(uploaded_files)
         ingest_msg = MCPMessage(
             sender="IngestionAgent",
@@ -78,7 +78,7 @@ def process_with_agents(uploaded_files, prompt):
             payload={"chunks": chunks, "file_count": len(uploaded_files)}
         )
         
-        # Step 2: Retrieval Agent (FAST - no embeddings)
+       
         relevant_chunks = simple_retrieval(chunks, prompt)
         retrieval_msg = MCPMessage(
             sender="RetrievalAgent",
@@ -88,11 +88,10 @@ def process_with_agents(uploaded_files, prompt):
             payload={"retrieved_context": relevant_chunks, "query": prompt}
         )
         
-        # Step 3: LLM Response Agent
+        
         if relevant_chunks:
             context = "\n\n".join(relevant_chunks[:3])
             
-            # Call Gemini API
             import google.generativeai as genai
             from dotenv import load_dotenv
             
@@ -151,7 +150,7 @@ def process_simple(uploaded_files, prompt):
     """Simple mode - even faster"""
     try:
         chunks = extract_text_simple(uploaded_files)
-        context = "\n\n".join(chunks[:5])[:3000]  # Limit context
+        context = "\n\n".join(chunks[:5])[:3000]  
         
         import google.generativeai as genai
         from dotenv import load_dotenv
@@ -185,11 +184,11 @@ Answer:"""
         else:
             return f"❌ Error: {str(e)[:100]}..."
 
-# Initialize session state
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# File upload
+
 st.subheader("📁 Upload Documents")
 uploaded_files = st.file_uploader(
     "Choose files", 
@@ -203,7 +202,7 @@ if uploaded_files:
     file_names = [f.name for f in uploaded_files]
     st.write("📄 Files: " + ", ".join(file_names))
 
-# Settings
+
 col1, col2 = st.columns([1, 1])
 with col1:
     use_agents = st.checkbox("🤖 Use Multi-Agent System", value=True, 
@@ -215,15 +214,15 @@ with col2:
 
 st.divider()
 
-# Chat section
+
 st.subheader("💬 Chat")
 
-# Display messages
+
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.write(message["content"])
         
-        # Show source context if available in message history
+        
         if message["role"] == "assistant" and "source_context" in message:
             source_context = message["source_context"]
             trace_id = message.get("trace_id", "unknown")
@@ -236,22 +235,21 @@ for message in st.session_state.messages:
                         if i < len(source_context) - 1:
                             st.divider()
 
-# Chat input
 prompt = st.chat_input("Ask about your documents...")
 
-# Process the input
+
 if prompt:
     if not uploaded_files:
         st.error("Please upload documents first!")
     else:
-        # Add user message
+        
         st.session_state.messages.append({"role": "user", "content": prompt})
         
-        # Show user message immediately
+        
         with st.chat_message("user"):
             st.write(prompt)
         
-        # Process and show response
+        
         with st.chat_message("assistant"):
             with st.spinner("Processing..."):
                 try:
@@ -263,7 +261,7 @@ if prompt:
                         
                         st.write(answer)
                         
-                        # Show source context if available
+                        
                         if source_context:
                             with st.expander("📋 View Source Context", expanded=False):
                                 st.write(f"**Trace ID:** `{trace_id}`")
@@ -273,7 +271,7 @@ if prompt:
                                     if i < len(source_context) - 1:
                                         st.divider()
                         
-                        # Store message with source context for history
+                        
                         st.session_state.messages.append({
                             "role": "assistant", 
                             "content": answer,
@@ -281,7 +279,7 @@ if prompt:
                             "trace_id": trace_id
                         })
                     else:
-                        # Simple mode
+                        
                         answer = process_simple(uploaded_files, prompt)
                         st.write(answer)
                         st.session_state.messages.append({"role": "assistant", "content": answer})
@@ -291,5 +289,5 @@ if prompt:
                     st.error(error_msg)
                     st.session_state.messages.append({"role": "assistant", "content": error_msg})
         
-        # Force rerun to update the UI
+        
         st.rerun()
