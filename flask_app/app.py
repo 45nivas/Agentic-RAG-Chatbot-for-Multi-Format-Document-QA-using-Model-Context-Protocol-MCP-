@@ -14,8 +14,12 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from agents.coordinator_agent import CoordinatorAgent
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-change-in-production'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+
+# Production-ready configuration
+app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB for production
+app.config['ENV'] = os.environ.get('FLASK_ENV', 'production')
+app.config['DEBUG'] = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -191,5 +195,20 @@ def favicon():
     except:
         return '', 204
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint for Docker and cloud deployments"""
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'version': '1.0.0'
+    }), 200
+
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Production-ready server configuration
+    host = os.environ.get('HOST', '0.0.0.0')
+    port = int(os.environ.get('PORT', 5000))
+    debug = app.config['DEBUG']
+    
+    logger.info(f"Starting RAG Chatbot server on {host}:{port}")
+    app.run(debug=debug, host=host, port=port)
