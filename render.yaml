@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: rag-chatbot
+    env: python
+    plan: free
+    buildCommand: ./build.sh
+    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.6
+      - key: PIP_NO_CACHE_DIR
+        value: 1
+      - key: SETUPTOOLS_USE_DISTUTILS
+        value: stdlib
