@@ -4,6 +4,14 @@ import uuid
 import logging
 from datetime import datetime
 from werkzeug.utils import secure_filename
+import google.generativeai as genai
+from dotenv import load_dotenv
+import PyPDF2
+import docx
+from pptx import Presentation
+import pandas as pd
+
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -16,6 +24,12 @@ app.config['DEBUG'] = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Configure Gemini AI
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel('gemini-pro')
+
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'pptx', 'csv', 'txt', 'md'}
 
@@ -26,6 +40,49 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def extract_text_from_file(filepath, filename):
+    """Extract text content from uploaded files"""
+    try:
+        file_ext = filename.rsplit('.', 1)[1].lower()
+        
+        if file_ext == 'pdf':
+            with open(filepath, 'rb') as file:
+                reader = PyPDF2.PdfReader(file)
+                text = ""
+                for page in reader.pages:
+                    text += page.extract_text() + "\n"
+                return text
+                
+        elif file_ext == 'docx':
+            doc = docx.Document(filepath)
+            text = ""
+            for paragraph in doc.paragraphs:
+                text += paragraph.text + "\n"
+            return text
+            
+        elif file_ext == 'pptx':
+            prs = Presentation(filepath)
+            text = ""
+            for slide in prs.slides:
+                for shape in slide.shapes:
+                    if hasattr(shape, "text"):
+                        text += shape.text + "\n"
+            return text
+            
+        elif file_ext == 'csv':
+            df = pd.read_csv(filepath)
+            return df.to_string()
+            
+        elif file_ext in ['txt', 'md']:
+            with open(filepath, 'r', encoding='utf-8') as file:
+                return file.read()
+                
+    except Exception as e:
+        logger.error(f"Error extracting text from {filename}: {str(e)}")
+        return f"Error reading file: {str(e)}"
+    
+    return "Could not extract text from this file type."
 
 @app.route('/')
 def index():
@@ -54,9 +111,14 @@ def upload_files():
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
                 
                 file.save(filepath)
+                
+                # Extract text content
+                text_content = extract_text_from_file(filepath, filename)
+                
                 uploaded_files.append({
                     'filename': filename,
-                    'filepath': filepath
+                    'filepath': filepath,
+                    'content': text_content[:2000]  # Store first 2000 chars for session
                 })
         
         if not uploaded_files:
@@ -67,7 +129,7 @@ def upload_files():
         
         return jsonify({
             'success': True,
-            'message': f'{len(uploaded_files)} file(s) uploaded successfully',
+            'message': f'{len(uploaded_files)} file(s) uploaded and processed successfully',
             'files': [f['filename'] for f in uploaded_files]
         })
     
@@ -87,19 +149,47 @@ def chat():
         if not uploaded_files:
             return jsonify({'error': 'Please upload documents first'}), 400
         
-        # For now, return a demo response until we add back the AI features
-        demo_response = f"Demo Response: I received your message '{user_message}' and I can see you've uploaded {len(uploaded_files)} file(s). The full AI features will be enabled soon!"
+        # Get document content
+        document_context = ""
+        for file_info in uploaded_files:
+            filepath = file_info.get('filepath')
+            filename = file_info.get('filename')
+            if filepath and os.path.exists(filepath):
+                # Re-extract full content for AI processing
+                full_content = extract_text_from_file(filepath, filename)
+                document_context += f"\n\n=== Content from {filename} ===\n{full_content}\n"
+        
+        # Generate AI response using Gemini
+        if GEMINI_API_KEY and document_context:
+            try:
+                prompt = f"""You are a helpful AI assistant specializing in document analysis. 
+                
+Based on the following document content, please answer the user's question:
+
+DOCUMENT CONTENT:
+{document_context}
+
+USER QUESTION: {user_message}
+
+Please provide a helpful, accurate response based on the document content. If the information isn't in the documents, please say so."""
+
+                response = model.generate_content(prompt)
+                ai_response = response.text
+                
+            except Exception as e:
+                logger.error(f"Gemini API error: {str(e)}")
+                ai_response = f"I found your documents about {', '.join([f['filename'] for f in uploaded_files])}, but I'm having trouble processing them right now. The documents appear to contain information, but I cannot provide a detailed analysis at the moment."
+        else:
+            ai_response = f"I can see you've uploaded {len(uploaded_files)} file(s), but I need the Gemini API to be properly configured to analyze the content and answer your question."
         
         conversation = session.get('conversation', [])
         conversation.append({
             'user': user_message,
-            'assistant': demo_response,
+            'assistant': ai_response,
             'metadata': {
-                'chunks_found': 10,
-                'context_found': 3,
                 'files_processed': len(uploaded_files),
-                'max_similarity': 0.85,
-                'threshold_met': True
+                'has_ai': bool(GEMINI_API_KEY),
+                'timestamp': datetime.now().isoformat()
             }
         })
         session['conversation'] = conversation
@@ -107,15 +197,12 @@ def chat():
         
         return jsonify({
             'success': True,
-            'response': demo_response,
+            'response': ai_response,
             'metadata': {
-                'chunks_found': 10,
-                'context_found': 3,
                 'files_processed': len(uploaded_files),
-                'max_similarity': 0.85,
-                'threshold_met': True
-            },
-            'source_context': ["Demo context 1", "Demo context 2", "Demo context 3"]
+                'has_ai': bool(GEMINI_API_KEY),
+                'timestamp': datetime.now().isoformat()
+            }
         })
             
     except Exception as e:
@@ -146,10 +233,11 @@ def health():
         has_files = 'uploaded_files' in session and len(session['uploaded_files']) > 0
         return jsonify({
             'status': 'healthy',
-            'service': 'Agentic RAG Chatbot - Full UI Version',
+            'service': 'Agentic RAG Chatbot - AI Enabled',
             'has_files': has_files,
+            'ai_enabled': bool(GEMINI_API_KEY),
             'timestamp': datetime.now().isoformat(),
-            'version': '2.0.0'
+            'version': '2.1.0'
         })
     except Exception as e:
         logger.error(f"Health check error: {str(e)}")
