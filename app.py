@@ -26,10 +26,18 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Configure Gemini AI
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-pro')
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyCyuSLpjW7e7z4tmWcqHzg5dNQTmlzEqGc')
+model = None
+if GEMINI_API_KEY and GEMINI_API_KEY != 'your-gemini-api-key':
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel('gemini-pro')
+        logger.info("Gemini AI configured successfully")
+    except Exception as e:
+        logger.error(f"Failed to configure Gemini AI: {str(e)}")
+        model = None
+else:
+    logger.warning("No valid Gemini API key found")
 
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'pptx', 'csv', 'txt', 'md'}
@@ -167,8 +175,13 @@ def chat():
                 document_context += f"\n\n=== Content from {filename} ===\n{full_content}\n"
         
         # Generate AI response using Gemini
-        if GEMINI_API_KEY and document_context:
+        if model and document_context:
             try:
+                # Limit document context to prevent token overflow
+                max_context_length = 8000
+                if len(document_context) > max_context_length:
+                    document_context = document_context[:max_context_length] + "\n[Document truncated for processing...]"
+                
                 prompt = f"""You are a helpful AI assistant specializing in document analysis. 
                 
 Based on the following document content, please answer the user's question:
@@ -182,12 +195,15 @@ Please provide a helpful, accurate response based on the document content. If th
 
                 response = model.generate_content(prompt)
                 ai_response = response.text
+                logger.info("Successfully generated AI response")
                 
             except Exception as e:
                 logger.error(f"Gemini API error: {str(e)}")
-                ai_response = f"I found your documents about {', '.join([f['filename'] for f in uploaded_files])}, but I'm having trouble processing them right now. The documents appear to contain information, but I cannot provide a detailed analysis at the moment."
+                ai_response = f"I successfully found and read your document '{uploaded_files[0]['filename']}'. However, I'm experiencing a temporary issue with the AI processing. Please try asking your question again, or try a simpler question like 'What is this document about?' or 'Summarize the main points'."
+        elif not model:
+            ai_response = f"I can see you've uploaded {len(uploaded_files)} file(s) including '{uploaded_files[0]['filename']}'. The AI service is currently being configured. Please try again in a moment."
         else:
-            ai_response = f"I can see you've uploaded {len(uploaded_files)} file(s), but I need the Gemini API to be properly configured to analyze the content and answer your question."
+            ai_response = f"I can see you've uploaded {len(uploaded_files)} file(s), but I need document content to analyze. Please make sure your files contain readable text."
         
         conversation = session.get('conversation', [])
         conversation.append({
@@ -195,7 +211,7 @@ Please provide a helpful, accurate response based on the document content. If th
             'assistant': ai_response,
             'metadata': {
                 'files_processed': len(uploaded_files),
-                'has_ai': bool(GEMINI_API_KEY),
+                'has_ai': bool(model),
                 'timestamp': datetime.now().isoformat()
             }
         })
@@ -207,7 +223,7 @@ Please provide a helpful, accurate response based on the document content. If th
             'response': ai_response,
             'metadata': {
                 'files_processed': len(uploaded_files),
-                'has_ai': bool(GEMINI_API_KEY),
+                'has_ai': bool(model),
                 'timestamp': datetime.now().isoformat()
             }
         })
@@ -242,7 +258,7 @@ def health():
             'status': 'healthy',
             'service': 'Agentic RAG Chatbot - AI Enabled',
             'has_files': has_files,
-            'ai_enabled': bool(GEMINI_API_KEY),
+            'ai_enabled': bool(model),
             'timestamp': datetime.now().isoformat(),
             'version': '2.1.0'
         })
