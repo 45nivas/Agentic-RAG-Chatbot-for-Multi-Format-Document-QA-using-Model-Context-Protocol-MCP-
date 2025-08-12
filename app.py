@@ -1,21 +1,13 @@
 from flask import Flask, render_template, request, jsonify, session
 import os
-import sys
 import uuid
 import logging
 from datetime import datetime
 from werkzeug.utils import secure_filename
-import tempfile
-from dotenv import load_dotenv
-
-load_dotenv()
-
-# For now, let's comment out the coordinator agent to get the UI working
-# from agents.coordinator_agent import CoordinatorAgent
 
 app = Flask(__name__)
 
-# Production-ready configuration
+# Production-ready configuration - Updated for deployment
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB for production
 app.config['ENV'] = os.environ.get('FLASK_ENV', 'production')
@@ -154,9 +146,10 @@ def health():
         has_files = 'uploaded_files' in session and len(session['uploaded_files']) > 0
         return jsonify({
             'status': 'healthy',
-            'service': 'Agentic RAG Chatbot',
+            'service': 'Agentic RAG Chatbot - Full UI Version',
             'has_files': has_files,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat(),
+            'version': '2.0.0'
         })
     except Exception as e:
         logger.error(f"Health check error: {str(e)}")

@@ -1,19 +1,4 @@
-# Core Flask Framework
 Flask==2.3.3
-Werkzeug==2.3.7
-python-dotenv==1.0.0
 gunicorn==21.2.0
-
-# Basic dependencies
+python-dotenv==1.0.0
 requests==2.31.0
-
-# Document processing
-python-docx==0.8.11
-PyPDF2==3.0.1
-python-pptx==0.6.21
-
-# AI/ML Dependencies 
-google-generativeai==0.3.0
-numpy==1.24.3
-chromadb==0.4.15
-sentence-transformers==2.2.2
