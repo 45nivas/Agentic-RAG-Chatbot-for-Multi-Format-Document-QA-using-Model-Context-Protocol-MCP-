@@ -31,8 +31,8 @@ model = None
 if GEMINI_API_KEY and GEMINI_API_KEY != 'your-gemini-api-key':
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-pro')
-        logger.info("Gemini AI configured successfully")
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        logger.info("Gemini AI configured successfully with gemini-1.5-flash")
     except Exception as e:
         logger.error(f"Failed to configure Gemini AI: {str(e)}")
         model = None
