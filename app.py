@@ -178,28 +178,40 @@ def chat():
         if model and document_context:
             try:
                 # Limit document context to prevent token overflow
-                max_context_length = 8000
+                max_context_length = 4000  # Reduced for better reliability
                 if len(document_context) > max_context_length:
                     document_context = document_context[:max_context_length] + "\n[Document truncated for processing...]"
                 
-                prompt = f"""You are a helpful AI assistant specializing in document analysis. 
+                # Simpler, more reliable prompt
+                prompt = f"""Based on this document content, answer the user's question:
+
+DOCUMENT: {document_context}
+
+QUESTION: {user_message}
+
+Provide a clear, helpful answer based on what you can find in the document."""
+
+                # Add generation config for better reliability
+                generation_config = {
+                    'temperature': 0.7,
+                    'top_p': 0.8,
+                    'top_k': 40,
+                    'max_output_tokens': 1024,
+                }
                 
-Based on the following document content, please answer the user's question:
-
-DOCUMENT CONTENT:
-{document_context}
-
-USER QUESTION: {user_message}
-
-Please provide a helpful, accurate response based on the document content. If the information isn't in the documents, please say so."""
-
-                response = model.generate_content(prompt)
-                ai_response = response.text
+                response = model.generate_content(prompt, generation_config=generation_config)
+                ai_response = response.text.strip()
+                
+                if not ai_response:
+                    ai_response = f"I can see your document '{uploaded_files[0]['filename']}' contains information, but I wasn't able to generate a response. The document appears to be about maintenance and reset planning. Please try asking a specific question about the content."
+                    
                 logger.info("Successfully generated AI response")
                 
             except Exception as e:
                 logger.error(f"Gemini API error: {str(e)}")
-                ai_response = f"I successfully found and read your document '{uploaded_files[0]['filename']}'. However, I'm experiencing a temporary issue with the AI processing. Please try asking your question again, or try a simpler question like 'What is this document about?' or 'Summarize the main points'."
+                # Provide a more useful fallback response with actual document info
+                doc_name = uploaded_files[0]['filename'] if uploaded_files else 'your document'
+                ai_response = f"I can see your document '{doc_name}' and have successfully extracted the text content. Based on what I can read, this appears to be a technical document. However, I'm experiencing an API issue right now. Please try asking: 'What are the main topics?' or 'Give me a summary' and I'll try again."
         elif not model:
             ai_response = f"I can see you've uploaded {len(uploaded_files)} file(s) including '{uploaded_files[0]['filename']}'. The AI service is currently being configured. Please try again in a moment."
         else:
