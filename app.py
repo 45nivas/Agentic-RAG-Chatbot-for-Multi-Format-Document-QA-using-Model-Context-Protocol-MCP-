@@ -9,7 +9,8 @@ from dotenv import load_dotenv
 import PyPDF2
 import docx
 from pptx import Presentation
-import pandas as pd
+import csv
+import io
 
 load_dotenv()
 
@@ -71,8 +72,14 @@ def extract_text_from_file(filepath, filename):
             return text
             
         elif file_ext == 'csv':
-            df = pd.read_csv(filepath)
-            return df.to_string()
+            with open(filepath, 'r', encoding='utf-8') as file:
+                csv_reader = csv.reader(file)
+                rows = list(csv_reader)
+                # Convert CSV to readable text format
+                text = ""
+                for row in rows:
+                    text += " | ".join(row) + "\n"
+                return text
             
         elif file_ext in ['txt', 'md']:
             with open(filepath, 'r', encoding='utf-8') as file:
