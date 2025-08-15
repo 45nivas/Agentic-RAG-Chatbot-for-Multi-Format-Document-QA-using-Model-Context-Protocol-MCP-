@@ -1,4 +1,7 @@
 # Agentic RAG Chatbot for Multi-Format Document QA
+
+Access the live demo here: [Agentic RAG Chatbot](https://agentic-rag-chatbot-for-multi-format-jwlk.onrender.com/)
+
 ## Smart Document Q&A Bot with Professional Interface
 
 An intelligent multi-agent chatbot that can answer questions about your documents using AI and Model Context Protocol (MCP). Upload PDFs, Word docs, PowerPoints and more - then ask questions and get instant answers through a professionally designed interface!
