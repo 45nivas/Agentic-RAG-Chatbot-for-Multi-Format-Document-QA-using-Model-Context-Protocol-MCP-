@@ -1,6 +1,7 @@
 # Agentic RAG Chatbot for Multi-Format Document QA
 
-🚀 **Live Demo:** [🌐 Click Here to Try the Chatbot!](https://agentic-rag-chatbot-for-multi-format-jwlk.onrender.com/)  
+[![Live Demo](https://img.shields.io/badge/🌐%20Live%20Demo-Click%20Here-blue?style=for-the-badge)](https://agentic-rag-chatbot-for-multi-format-jwlk.onrender.com/)
+
 
 ## Smart Document Q&A Bot with Professional Interface
 
