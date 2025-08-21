@@ -1,94 +1,156 @@
 # Agentic RAG Chatbot for Multi-Format Document QA
 
-[![Live Demo](https://img.shields.io/badge/🌐%20Live%20Demo-Click%20Here-blue?style=for-the-badge)](https://agentic-rag-chatbot-for-multi-format-jwlk.onrender.com/)
+[![Live Demo](https://img.shields.io/badge/🌐%20Live%20Demo-Click%20Here-blue?style=for-the-badge)](https://rag-chatbot-8ykv.onrender.com/)
 
+## 🚀 Smart Document Q&A Bot with Modern AI
 
-## Smart Document Q&A Bot with Professional Interface
+An intelligent RAG chatbot that answers questions about your documents using **Sentence Transformers** and **ChromaDB**. Upload PDFs, Word docs, PowerPoints and more - then ask questions and get instant AI-powered answers!
 
-An intelligent multi-agent chatbot that can answer questions about your documents using AI and Model Context Protocol (MCP). Upload PDFs, Word docs, PowerPoints and more - then ask questions and get instant answers through a professionally designed interface!
+## ✨ Key Features
 
-## What it does
-- **Multi-format document support**: PDF, DOCX, PPTX, CSV, TXT, Markdown
-- **Natural language queries**: Ask questions in plain English
-- **AI-powered responses**: Get intelligent answers with source references
-- **Multi-turn conversations**: Context-aware chat that remembers previous questions
-- **Voice-to-Text Input**: Browser-based speech recognition using Web Speech API
-- **Smart Similarity Filtering**: Enhanced prompt engineering with similarity thresholds
-- **Professional dual interface**: 
-  - **Development UI**: Clean Streamlit interface for testing
-  - **Production UI**: Professional Flask web app with modern design featuring elegant orange/black branding
+- **Multi-format support**: PDF, DOCX, PPTX, CSV, TXT, Markdown
+- **Modern AI Stack**: Sentence Transformers + ChromaDB vector database  
+- **Semantic Search**: True meaning understanding (not just keywords)
+- **Voice Input**: Browser-based speech recognition 🎤
+- **Multi-Agent Architecture**: Professional orchestrated processing
+- **Real-time Chat**: Context-aware conversations
+- **Professional UI**: Modern Flask web interface
 
-## Recent Enhancements (August 2025)
+## 🧠 Modern AI Technology
 
-### 🎤 **Voice Input & Speech Recognition**
-- **Microphone Button**: Added adjacent to input field for hands-free operation
-- **Web Speech API Integration**: Browser-based speech-to-text with real-time transcription
-- **Visual Feedback**: Recording animations, status indicators, and completion notifications
-- **Error Handling**: Comprehensive support for unsupported browsers and permission issues
-- **Cross-Browser Support**: Works on Chrome, Edge, and Chromium-based browsers
+### **Sentence Transformers**
+- `all-MiniLM-L6-v2` model for semantic embeddings
+- 384-dimensional vectors for true meaning understanding
+- Handles synonyms, context, and semantic relationships
 
-### 🛡️ **Enhanced Security & Prompt Engineering**
-- **Similarity Threshold Filtering**: Questions below 15% relevance show helpful guidance instead of potentially unsafe responses
-- **Secure LLM Prompting**: Advanced prompt engineering prevents code generation and system command execution
-- **Document-Focused Responses**: AI strictly limited to answering based on uploaded document content
-- **Protection Against Prompt Injection**: Safeguards against attempts to bypass system restrictions
+### **ChromaDB Vector Database**
+- Persistent vector storage with HNSW indexing
+- Cosine similarity search for accurate retrieval
+- Survives server restarts (not just session-based)
 
-### 🎯 **Smart User Experience**
-- **Context-Aware Suggestions**: Auto-detects resume/CV documents and provides relevant question suggestions
-- **Dynamic Question Prompts**: Tailored suggestions based on document type (resume skills, experience, education)
-- **Debug Information**: Real-time similarity scores and relevance indicators for transparency
-- **Enhanced Error Messages**: Helpful guidance when questions don't match document content
-- **Progressive Response Quality**: Different response strategies based on similarity confidence levels
+### **Multi-Agent System**
+- **CoordinatorAgent**: Orchestrates workflow
+- **IngestionAgent**: Document parsing and chunking
+- **RetrievalAgent**: Semantic similarity search
+- **LLMResponseAgent**: AI response generation
 
-### 🔧 **Technical Improvements**
-- **Optimized Similarity Calculation**: Fixed cosine distance computation with ChromaDB integration
-- **Enhanced Embedding Configuration**: Proper cosine similarity space configuration for better accuracy
-- **Improved Document Parsing**: Better text extraction and chunking for various file formats
-- **Real-time Debug Logging**: Comprehensive debugging information for similarity scores and document matching
-- **Multi-level Response Strategy**: Adaptive responses based on content relevance (15-40% vs 40%+ similarity)
+## 🚀 Quick Start
 
-## Tech Stack
-- **Frontend & UI**: 
-  - **Streamlit**: Optimized development interface with fast loading (2-3 seconds)
-  - **Flask**: Production web application with professional branding and voice input
-  - **HTML/CSS/JavaScript**: Custom responsive design with corporate orange/black theme
-  - **Web Speech API**: Browser-based voice recognition for hands-free interaction
-- **AI Engine**: Google Gemini 1.5 Flash (Large Language Model) with intelligent rate limiting and enhanced prompting
-- **Search System**: 
-  - **Production**: ChromaDB with Sentence Transformers embeddings for vector search and cosine similarity
-  - **Optimized**: Keyword-based retrieval for lightning-fast performance
-  - **Smart Filtering**: Similarity threshold-based response filtering (15% minimum relevance)
-- **Document Processing**: PyPDF2, python-docx, python-pptx, pandas with enhanced text extraction
-- **Architecture**: Multi-agent system with Model Context Protocol (MCP) and debug logging
-- **Security**: Environment variable configuration with python-dotenv and prompt injection protection
-- **Branding**: Professional design with modern logo integration and voice interaction indicators
-
-## Quick Start
-
-### Option 1: Streamlit Development Interface
-1. Clone this repository
-2. Install the required packages:
+1. **Install dependencies:**
    ```bash
    pip install -r requirements.txt
    ```
-3. **Set up your API key securely:**
-   ```bash
-   # Create a .env file in the project root
-   echo "GEMINI_API_KEY=your_actual_api_key_here" > .env
-   ```
-   Replace `your_actual_api_key_here` with your Google Gemini API key.
 
-4. Run the Streamlit application:
+2. **Set up API key:**
    ```bash
-   streamlit run ui/app.py
+   echo "GEMINI_API_KEY=your_api_key_here" > .env
    ```
-5. Open your browser to `http://localhost:8501`
 
-### Option 2: Professional Flask Interface
-1. Follow steps 1-3 above for setup
-2. Run the Flask application:
+3. **Run the application:**
    ```bash
-   python flask_app/app.py
+   python app.py
+   ```
+
+4. **Open browser:** `http://localhost:5000`
+
+## 💡 How It Works
+
+1. **Upload documents** - Support for multiple formats
+2. **Semantic processing** - Documents chunked and embedded using Sentence Transformers
+3. **Vector storage** - Embeddings stored in ChromaDB for fast retrieval
+4. **Ask questions** - Type or use voice input 🎤
+5. **Semantic search** - Find relevant content using cosine similarity
+6. **AI response** - Generate context-aware answers using Gemini AI
+
+## 🏗️ Architecture
+
+```
+User Query → Semantic Embedding → Vector Search → Context Retrieval → AI Response
+     ↓              ↓                    ↓              ↓              ↓
+Voice/Text → SentenceTransformer → ChromaDB → RetrievalAgent → GeminiAI
+```
+
+## �️ Tech Stack
+
+- **AI Models**: Google Gemini 1.5 Flash + Sentence Transformers
+- **Vector DB**: ChromaDB with HNSW indexing
+- **Backend**: Flask with multi-agent architecture
+- **Frontend**: Modern HTML/CSS/JS with voice input
+- **ML Libraries**: PyTorch, Transformers, SentenceTransformers
+- **Document Processing**: PyPDF2, python-docx, python-pptx
+
+## 📁 Project Structure
+
+```
+├── app.py                     # Main Flask application
+├── agents/                    # Multi-agent system
+│   ├── coordinator_agent.py  # Workflow orchestrator
+│   ├── ingestion_agent.py    # Document processing
+│   ├── retrieval_agent.py    # Vector search
+│   └── llm_response_agent.py # AI responses
+├── static/                    # Frontend assets
+├── templates/                 # HTML templates
+├── requirements.txt           # Dependencies
+└── .env                      # API configuration
+```
+
+## 🎯 What Makes This Professional
+
+### **Modern AI Stack**
+- ✅ Sentence Transformers (not basic TF-IDF)
+- ✅ ChromaDB vector database (not in-memory only)
+- ✅ Semantic understanding (not keyword matching)
+- ✅ Persistent storage (survives restarts)
+
+### **Production Features**
+- ✅ Multi-agent architecture
+- ✅ Voice input integration
+- ✅ Professional UI/UX
+- ✅ Error handling & logging
+- ✅ Session management
+- ✅ Security best practices
+
+### **Performance**
+- ✅ Sub-3 second responses
+- ✅ Efficient vector search
+- ✅ Real-time similarity scoring
+- ✅ Context-aware conversations
+
+## 🔒 Security & Best Practices
+
+- **API Key Protection**: Environment variables with `.env` file
+- **Document Scope**: AI responses limited to uploaded content
+- **Session Security**: Secure Flask session management
+- **Input Validation**: Safe file handling and processing
+
+## 🌐 Deployment
+
+**Local Development:**
+```bash
+python app.py
+# Access at http://localhost:5000
+```
+
+**Production Ready:**
+- Professional Flask application
+- Environment-based configuration
+- Cloud deployment compatible (Render, Heroku, etc.)
+
+## 📋 Example Usage
+
+**For Resumes:**
+- "What AI/ML skills are mentioned?"
+- "What is the educational background?"
+- "What programming languages are listed?"
+
+**For Business Documents:**
+- "What are the key findings?"
+- "Can you summarize the main points?"
+- "What recommendations are mentioned?"
+
+---
+
+**Built with modern AI technologies for enterprise-grade document Q&A.**
    ```
 3. Open your browser to `http://localhost:5000`
 4. Experience the professional interface with modern branding and UI
