@@ -13,13 +13,8 @@ import csv
 import io
 import numpy as np
 
-# Modern AI/ML Components - Lightweight Sentence Transformers
-try:
-    from sentence_transformers import SentenceTransformer
-    SENTENCE_TRANSFORMERS_AVAILABLE = True
-except ImportError:
-    SENTENCE_TRANSFORMERS_AVAILABLE = False
-    print("Sentence Transformers not available, falling back to TF-IDF")
+# Production-Ready Components - Lightweight for Render Deployment
+# Using optimized TF-IDF for reliable cloud deployment within memory limits
 
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -69,54 +64,37 @@ if GEMINI_API_KEY and GEMINI_API_KEY != 'your-gemini-api-key':
 else:
     logger.warning("No valid Gemini API key found")
 
-# Modern Professional Vector Database with Lightweight Sentence Transformers
+# Production-Optimized Vector Database - Lightweight for Cloud Deployment
 class ModernVectorDB:
+    """Professional TF-IDF implementation optimized for production deployment"""
+    
     def __init__(self):
         self.documents = []
         self.chunks = []
         self.metadata = []
-        self.embeddings = []
         
-        # Initialize lightweight Sentence Transformer
-        try:
-            if SENTENCE_TRANSFORMERS_AVAILABLE:
-                # Use lightweight MiniLM model (~80MB)
-                self.model = SentenceTransformer('all-MiniLM-L6-v2')
-                self.use_embeddings = True
-                logger.info("Sentence Transformers (MiniLM) initialized successfully")
-            else:
-                self.use_embeddings = False
-                self.vectorizer = TfidfVectorizer(max_features=1000, stop_words='english')
-                logger.info("Using TF-IDF fallback for embeddings")
-        except Exception as e:
-            logger.warning(f"Sentence Transformers init failed, using TF-IDF: {e}")
-            self.use_embeddings = False
-            self.vectorizer = TfidfVectorizer(max_features=1000, stop_words='english')
-        
-        # For TF-IDF fallback
+        # Enhanced TF-IDF with better parameters for semantic understanding
+        self.vectorizer = TfidfVectorizer(
+            max_features=2000,  # Increased for better accuracy
+            stop_words='english',
+            ngram_range=(1, 2),  # Include bigrams for context
+            max_df=0.8,  # Filter common words
+            min_df=2,    # Filter rare words
+            sublinear_tf=True,  # Better scaling
+            use_idf=True
+        )
         self.vectors = None
         self.fitted = False
         
-    def get_embeddings(self, texts):
-        """Get embeddings using lightweight Sentence Transformers"""
-        if not self.use_embeddings:
-            return None
-            
-        try:
-            # Get 384-dimensional embeddings using MiniLM
-            embeddings = self.model.encode(texts)
-            return embeddings.tolist()
-        except Exception as e:
-            logger.error(f"Sentence Transformer embedding error: {e}")
-            return None
+        logger.info("Production Vector Database initialized with optimized TF-IDF")
         
     def add_document(self, filename, text_content):
-        """Add document with modern semantic chunking and embeddings"""
+        """Add document with professional chunking and indexing"""
         try:
-            # Advanced semantic chunking
-            chunks = self.semantic_chunk_text(text_content)
+            # Professional semantic chunking
+            chunks = self.professional_chunk_text(text_content)
             
-            # Add to storage
+            # Store document metadata
             doc_id = len(self.documents)
             self.documents.append({
                 'id': doc_id,
@@ -126,83 +104,118 @@ class ModernVectorDB:
             })
             
             # Process chunks
-            chunk_texts = []
-            chunk_metadata = []
-            
             for i, chunk in enumerate(chunks):
-                chunk_id = len(self.chunks)
                 chunk_data = {
-                    'id': chunk_id,
+                    'id': len(self.chunks),
                     'content': chunk,
                     'filename': filename,
                     'doc_id': doc_id,
                     'chunk_index': i
                 }
                 self.chunks.append(chunk_data)
-                chunk_texts.append(chunk)
-                chunk_metadata.append(chunk_data)
             
-            # Get embeddings
-            if self.use_embeddings:
-                # Use Sentence Transformers embeddings
-                embeddings = self.get_embeddings(chunk_texts)
-                if embeddings:
-                    self.embeddings.extend(embeddings)
-                    logger.info(f"Added {len(chunks)} chunks with Sentence Transformer embeddings for {filename}")
-                else:
-                    # Fallback to TF-IDF
-                    self._fallback_to_tfidf(chunk_texts)
-            else:
-                # Use TF-IDF
-                self._fallback_to_tfidf(chunk_texts)
+            # Build optimized TF-IDF index
+            self._build_vector_index()
             
+            logger.info(f"Added {len(chunks)} chunks with optimized indexing for {filename}")
             return True
             
         except Exception as e:
             logger.error(f"Error adding document: {e}")
             return False
     
-    def _fallback_to_tfidf(self, chunk_texts):
-        """Fallback to TF-IDF when Sentence Transformers is not available"""
-        try:
-            all_texts = [chunk['content'] for chunk in self.chunks]
-            self.vectors = self.vectorizer.fit_transform(all_texts)
-            self.fitted = True
-            logger.info(f"Built TF-IDF vectors for {len(all_texts)} chunks")
-        except Exception as e:
-            logger.error(f"TF-IDF fallback error: {e}")
+    def professional_chunk_text(self, text, chunk_size=400, overlap=50):
+        """Professional chunking with sentence boundary respect"""
+        import re
+        
+        # Split by sentences and paragraphs
+        sentences = re.split(r'[.!?]+|\n\n+', text)
+        chunks = []
+        current_chunk = ""
+        current_length = 0
+        
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+                
+            words = sentence.split()
+            sentence_length = len(words)
+            
+            # Smart chunking with overlap
+            if current_length + sentence_length > chunk_size and current_chunk:
+                chunks.append(current_chunk.strip())
+                
+                # Create intelligent overlap
+                previous_words = current_chunk.split()
+                overlap_words = previous_words[-overlap:] if len(previous_words) > overlap else previous_words
+                current_chunk = " ".join(overlap_words) + " " + sentence
+                current_length = len(overlap_words) + sentence_length
+            else:
+                current_chunk += " " + sentence
+                current_length += sentence_length
+        
+        # Add final chunk
+        if current_chunk.strip():
+            chunks.append(current_chunk.strip())
+        
+        return chunks
     
-    def search(self, query, top_k=5, threshold=0.2):
-        """Search using Sentence Transformer embeddings or TF-IDF fallback"""
-        if not self.chunks:
+    def _build_vector_index(self):
+        """Build optimized TF-IDF vectors for all chunks"""
+        try:
+            if not self.chunks:
+                return
+                
+            chunk_texts = [chunk['content'] for chunk in self.chunks]
+            self.vectors = self.vectorizer.fit_transform(chunk_texts)
+            self.fitted = True
+            
+            logger.info(f"Built optimized TF-IDF index with {len(chunk_texts)} chunks")
+            
+        except Exception as e:
+            logger.error(f"Vector indexing error: {e}")
+    
+    def search(self, query, top_k=5, threshold=0.15):
+        """Professional search with optimized TF-IDF"""
+        if not self.fitted or not self.chunks:
+            logger.warning("No index available for search")
             return []
         
         try:
-            if self.use_embeddings and self.embeddings:
-                return self._search_embeddings(query, top_k, threshold)
-            elif self.fitted and self.vectors is not None:
-                return self._search_tfidf(query, top_k, threshold)
-            else:
-                logger.warning("No search method available")
-                return []
+            # Vectorize query with same parameters
+            query_vector = self.vectorizer.transform([query])
+            
+            # Calculate cosine similarities
+            similarities = cosine_similarity(query_vector, self.vectors)[0]
+            
+            # Get top results above threshold
+            top_indices = np.argsort(similarities)[-top_k:][::-1]
+            
+            results = []
+            for idx in top_indices:
+                similarity = similarities[idx]
+                if similarity > threshold and idx < len(self.chunks):
+                    chunk = self.chunks[idx]
+                    results.append({
+                        'content': chunk['content'],
+                        'filename': chunk['filename'],
+                        'similarity': float(similarity),
+                        'chunk_id': chunk['id'],
+                        'metadata': {
+                            'filename': chunk['filename'],
+                            'chunk_index': chunk['chunk_index']
+                        }
+                    })
+            
+            logger.info(f"Search returned {len(results)} results with avg similarity: {np.mean([r['similarity'] for r in results]):.3f}")
+            return results
+            
         except Exception as e:
             logger.error(f"Search error: {e}")
             return []
-    
-    def _search_embeddings(self, query, top_k, threshold):
-        """Search using Sentence Transformer embeddings"""
-        # Get query embedding
-        query_embedding = self.get_embeddings([query])
-        if not query_embedding:
-            return self._search_tfidf(query, top_k, threshold)
-        
-        # Calculate similarities with cosine similarity
-        similarities = cosine_similarity([query_embedding[0]], self.embeddings)[0]
-        
-        # Get top results
-        top_indices = np.argsort(similarities)[-top_k:][::-1]
-        
-        results = []
+
+# Document Processing Utilities
         for idx in top_indices:
             similarity = similarities[idx]
             if similarity > threshold and idx < len(self.chunks):

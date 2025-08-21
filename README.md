@@ -1,34 +1,31 @@
 # Multi-Agent RAG Chatbot
 
-[![Live Demo](https://img.shields.io/badge/🌐%20Live%20Dem## 🛠️ Tech Stac## 🛠️ Tech Stack
+[![Live Demo](https://img.shields.io/badge/🌐%20Live%20Demo-Click%20Here-blue?style=for-the-badge)](https://rag-chatbot-8ykv.onrender.com/)
 
-- **AI**: Google Gemini 1.5 Flash + Sentence Transformers (MiniLM)
-- **Embeddings**: 384-dimensional semantic vectors (~80MB model)
-- **Backend**: Flask with multi-agent architecture  
-- **Frontend**: HTML/CSS/JS with voice input
-- **ML**: PyTorch, Transformers, Sentence-Transformers
-- **Documents**: PyPDF2, python-docx, python-pptx*Production (Render)**
-- **AI**: OpenAI text-embedding-3-small + Google Gemini 1.5 Flash
-- **Backend**: Flask with multi-agent architecture  
-- **Vector Search**: OpenAI embeddings with cosine similarity
-- **Deployment**: Lightweight, fast startup, cost-effective
+## 🚀 Smart Document Q&A Bot
 
-### **Development (Local)**  
-- **AI**: Sentence Transformers + Google Gemini 1.5 Flash
-- **Database**: ChromaDB with HNSW indexing
-- **ML**: PyTorch, Transformers, 384-dim embeddings
-- **Storage**: Persistent vector database
+Professional RAG system with dual deployment strategy for development and production.
 
-### **Common Features**
-- **Frontend**: HTML/CSS/JS with Web Speech API
-- **Documents**: PyPDF2, python-docx, python-pptx
-- **Architecture**: Multi-agent system with MCP messaging20Here-blue?style=for-the-badge)](https://rag-chatbot-8ykv.onrender.com/)
+## ✨ Key Features
 
-## 🚀 Smart Document Q&A Bot with Modern AI
+- **6 document formats** - PDF, DOCX, PPTX, CSV, TXT, MD
+- **Voice input** with microphone 🎤  
+- **Dual Architecture** - Advanced for dev, optimized for production
+- **Multi-agent system** - 4 specialized AI agents
+- **Real-time chat** interface
+- **Sub-3 second responses**
 
-Upload documents and ask questions using modern AI. Two versions available:
-- **Production** (Render): OpenAI Embeddings API - lightweight & fast
-- **Development** (Local): Sentence Transformers - full features offline
+## 🏗️ Dual Architecture
+
+### **Local Development** (`flask_app/app.py`)
+- **Sentence Transformers** - all-MiniLM-L6-v2 model (384d embeddings)
+- **ChromaDB** - Persistent vector storage with HNSW indexing
+- **Full AI Features** - Complete semantic understanding
+
+### **Production Deployment** (`app.py`)
+- **Optimized TF-IDF** - Enhanced with bigrams and better parameters
+- **Lightweight** - Fits in 512MB Render memory limit  
+- **Fast Startup** - No heavy model downloads
 
 ## ✨ Key Features
 

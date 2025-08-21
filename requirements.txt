@@ -13,5 +13,3 @@ python-pptx
 numpy
 scikit-learn
 scipy
-sentence-transformers
-torch
