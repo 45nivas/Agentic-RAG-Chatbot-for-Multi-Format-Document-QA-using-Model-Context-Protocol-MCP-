@@ -13,11 +13,16 @@ import csv
 import io
 import numpy as np
 
-# Modern AI/ML Components - Sentence Transformers & Vector DB
-from sentence_transformers import SentenceTransformer
-import chromadb
-import torch
+# Modern AI/ML Components - Lightweight Sentence Transformers
+try:
+    from sentence_transformers import SentenceTransformer
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
+    print("Sentence Transformers not available, falling back to TF-IDF")
+
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.feature_extraction.text import TfidfVectorizer
 import pickle
 import json
 
@@ -64,44 +69,50 @@ if GEMINI_API_KEY and GEMINI_API_KEY != 'your-gemini-api-key':
 else:
     logger.warning("No valid Gemini API key found")
 
-# Modern Professional Vector Database with Sentence Transformers
+# Modern Professional Vector Database with Lightweight Sentence Transformers
 class ModernVectorDB:
     def __init__(self):
         self.documents = []
         self.chunks = []
         self.metadata = []
+        self.embeddings = []
         
-        # Initialize ChromaDB for persistent vector storage
+        # Initialize lightweight Sentence Transformer
         try:
-            self.chroma_client = chromadb.PersistentClient(path="./chroma_db")
-            self.collection = self.chroma_client.get_or_create_collection(
-                name="documents",
-                metadata={"hnsw:space": "cosine"}
-            )
-            logger.info("ChromaDB initialized successfully")
+            if SENTENCE_TRANSFORMERS_AVAILABLE:
+                # Use lightweight MiniLM model (~80MB)
+                self.model = SentenceTransformer('all-MiniLM-L6-v2')
+                self.use_embeddings = True
+                logger.info("Sentence Transformers (MiniLM) initialized successfully")
+            else:
+                self.use_embeddings = False
+                self.vectorizer = TfidfVectorizer(max_features=1000, stop_words='english')
+                logger.info("Using TF-IDF fallback for embeddings")
         except Exception as e:
-            logger.warning(f"ChromaDB init failed, using in-memory: {e}")
-            self.chroma_client = None
-            self.collection = None
+            logger.warning(f"Sentence Transformers init failed, using TF-IDF: {e}")
+            self.use_embeddings = False
+            self.vectorizer = TfidfVectorizer(max_features=1000, stop_words='english')
         
-        # Initialize modern embedding model - Sentence Transformers
-        try:
-            self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-            logger.info("SentenceTransformer model loaded: all-MiniLM-L6-v2")
-        except Exception as e:
-            logger.error(f"Failed to load SentenceTransformer: {e}")
-            self.embedding_model = None
-        
-        # Fallback to in-memory vectors if needed
+        # For TF-IDF fallback
         self.vectors = None
+        self.fitted = False
+        
+    def get_embeddings(self, texts):
+        """Get embeddings using lightweight Sentence Transformers"""
+        if not self.use_embeddings:
+            return None
+            
+        try:
+            # Get 384-dimensional embeddings using MiniLM
+            embeddings = self.model.encode(texts)
+            return embeddings.tolist()
+        except Exception as e:
+            logger.error(f"Sentence Transformer embedding error: {e}")
+            return None
         
     def add_document(self, filename, text_content):
         """Add document with modern semantic chunking and embeddings"""
         try:
-            if not self.embedding_model:
-                logger.error("No embedding model available")
-                return False
-                
             # Advanced semantic chunking
             chunks = self.semantic_chunk_text(text_content)
             
@@ -114,44 +125,124 @@ class ModernVectorDB:
                 'chunks_count': len(chunks)
             })
             
-            # Generate embeddings using Sentence Transformers
-            embeddings = self.embedding_model.encode(chunks).tolist()
+            # Process chunks
+            chunk_texts = []
+            chunk_metadata = []
             
-            # Add chunks with metadata
             for i, chunk in enumerate(chunks):
-                self.chunks.append(chunk)
-                chunk_metadata = {
-                    'doc_id': doc_id,
-                    'chunk_id': i,
+                chunk_id = len(self.chunks)
+                chunk_data = {
+                    'id': chunk_id,
+                    'content': chunk,
                     'filename': filename,
-                    'chunk_type': 'semantic'
+                    'doc_id': doc_id,
+                    'chunk_index': i
                 }
-                self.metadata.append(chunk_metadata)
-                
-                # Store in ChromaDB if available
-                if self.collection:
-                    try:
-                        self.collection.add(
-                            embeddings=[embeddings[i]],
-                            documents=[chunk],
-                            metadatas=[chunk_metadata],
-                            ids=[f"{filename}_{doc_id}_{i}"]
-                        )
-                    except Exception as e:
-                        logger.warning(f"ChromaDB storage failed: {e}")
+                self.chunks.append(chunk_data)
+                chunk_texts.append(chunk)
+                chunk_metadata.append(chunk_data)
             
-            # Store embeddings in memory as backup
-            if self.vectors is None:
-                self.vectors = np.array(embeddings)
+            # Get embeddings
+            if self.use_embeddings:
+                # Use Sentence Transformers embeddings
+                embeddings = self.get_embeddings(chunk_texts)
+                if embeddings:
+                    self.embeddings.extend(embeddings)
+                    logger.info(f"Added {len(chunks)} chunks with Sentence Transformer embeddings for {filename}")
+                else:
+                    # Fallback to TF-IDF
+                    self._fallback_to_tfidf(chunk_texts)
             else:
-                self.vectors = np.vstack([self.vectors, embeddings])
+                # Use TF-IDF
+                self._fallback_to_tfidf(chunk_texts)
             
-            logger.info(f"Added {len(chunks)} semantic chunks from {filename} with embeddings")
             return True
             
         except Exception as e:
-            logger.error(f"Failed to add document to modern vector DB: {str(e)}")
+            logger.error(f"Error adding document: {e}")
             return False
+    
+    def _fallback_to_tfidf(self, chunk_texts):
+        """Fallback to TF-IDF when Sentence Transformers is not available"""
+        try:
+            all_texts = [chunk['content'] for chunk in self.chunks]
+            self.vectors = self.vectorizer.fit_transform(all_texts)
+            self.fitted = True
+            logger.info(f"Built TF-IDF vectors for {len(all_texts)} chunks")
+        except Exception as e:
+            logger.error(f"TF-IDF fallback error: {e}")
+    
+    def search(self, query, top_k=5, threshold=0.2):
+        """Search using Sentence Transformer embeddings or TF-IDF fallback"""
+        if not self.chunks:
+            return []
+        
+        try:
+            if self.use_embeddings and self.embeddings:
+                return self._search_embeddings(query, top_k, threshold)
+            elif self.fitted and self.vectors is not None:
+                return self._search_tfidf(query, top_k, threshold)
+            else:
+                logger.warning("No search method available")
+                return []
+        except Exception as e:
+            logger.error(f"Search error: {e}")
+            return []
+    
+    def _search_embeddings(self, query, top_k, threshold):
+        """Search using Sentence Transformer embeddings"""
+        # Get query embedding
+        query_embedding = self.get_embeddings([query])
+        if not query_embedding:
+            return self._search_tfidf(query, top_k, threshold)
+        
+        # Calculate similarities with cosine similarity
+        similarities = cosine_similarity([query_embedding[0]], self.embeddings)[0]
+        
+        # Get top results
+        top_indices = np.argsort(similarities)[-top_k:][::-1]
+        
+        results = []
+        for idx in top_indices:
+            similarity = similarities[idx]
+            if similarity > threshold and idx < len(self.chunks):
+                chunk = self.chunks[idx]
+                results.append({
+                    'content': chunk['content'],
+                    'filename': chunk['filename'],
+                    'similarity': float(similarity),
+                    'chunk_id': chunk['id']
+                })
+        
+        return results
+    
+    def _search_tfidf(self, query, top_k, threshold):
+        """Fallback search using TF-IDF"""
+        if not self.fitted:
+            return []
+        
+        # Transform query
+        query_vector = self.vectorizer.transform([query])
+        
+        # Calculate similarities
+        similarities = cosine_similarity(query_vector, self.vectors)[0]
+        
+        # Get top results
+        top_indices = np.argsort(similarities)[-top_k:][::-1]
+        
+        results = []
+        for idx in top_indices:
+            similarity = similarities[idx]
+            if similarity > threshold and idx < len(self.chunks):
+                chunk = self.chunks[idx]
+                results.append({
+                    'content': chunk['content'],
+                    'filename': chunk['filename'],
+                    'similarity': float(similarity),
+                    'chunk_id': chunk['id']
+                })
+        
+        return results
     
     def semantic_chunk_text(self, text, chunk_size=300, overlap=50):
         """Advanced semantic text chunking optimized for embeddings"""

@@ -1,57 +1,91 @@
-# Agentic RAG Chatbot for Multi-Format Document QA
+# Multi-Agent RAG Chatbot
 
-[![Live Demo](https://img.shields.io/badge/🌐%20Live%20Demo-Click%20Here-blue?style=for-the-badge)](https://rag-chatbot-8ykv.onrender.com/)
+[![Live Demo](https://img.shields.io/badge/🌐%20Live%20Dem## 🛠️ Tech Stac## 🛠️ Tech Stack
+
+- **AI**: Google Gemini 1.5 Flash + Sentence Transformers (MiniLM)
+- **Embeddings**: 384-dimensional semantic vectors (~80MB model)
+- **Backend**: Flask with multi-agent architecture  
+- **Frontend**: HTML/CSS/JS with voice input
+- **ML**: PyTorch, Transformers, Sentence-Transformers
+- **Documents**: PyPDF2, python-docx, python-pptx*Production (Render)**
+- **AI**: OpenAI text-embedding-3-small + Google Gemini 1.5 Flash
+- **Backend**: Flask with multi-agent architecture  
+- **Vector Search**: OpenAI embeddings with cosine similarity
+- **Deployment**: Lightweight, fast startup, cost-effective
+
+### **Development (Local)**  
+- **AI**: Sentence Transformers + Google Gemini 1.5 Flash
+- **Database**: ChromaDB with HNSW indexing
+- **ML**: PyTorch, Transformers, 384-dim embeddings
+- **Storage**: Persistent vector database
+
+### **Common Features**
+- **Frontend**: HTML/CSS/JS with Web Speech API
+- **Documents**: PyPDF2, python-docx, python-pptx
+- **Architecture**: Multi-agent system with MCP messaging20Here-blue?style=for-the-badge)](https://rag-chatbot-8ykv.onrender.com/)
 
 ## 🚀 Smart Document Q&A Bot with Modern AI
 
-An intelligent RAG chatbot that answers questions about your documents using **Sentence Transformers** and **ChromaDB**. Upload PDFs, Word docs, PowerPoints and more - then ask questions and get instant AI-powered answers!
+Upload documents and ask questions using modern AI. Two versions available:
+- **Production** (Render): OpenAI Embeddings API - lightweight & fast
+- **Development** (Local): Sentence Transformers - full features offline
 
 ## ✨ Key Features
 
-- **Multi-format support**: PDF, DOCX, PPTX, CSV, TXT, Markdown
-- **Modern AI Stack**: Sentence Transformers + ChromaDB vector database  
-- **Semantic Search**: True meaning understanding (not just keywords)
-- **Voice Input**: Browser-based speech recognition 🎤
-- **Multi-Agent Architecture**: Professional orchestrated processing
-- **Real-time Chat**: Context-aware conversations
-- **Professional UI**: Modern Flask web interface
+- **6 document formats** - PDF, DOCX, PPTX, CSV, TXT, MD
+- **Voice input** with microphone 🎤  
+- **Sentence Transformers** - Lightweight MiniLM embeddings (~80MB)
+- **Multi-agent architecture** - 4 specialized AI agents
+- **Real-time chat** interface
+- **Sub-3 second responses**
+- **Professional UI** with modern design
 
-## 🧠 Modern AI Technology
+## 🧠 AI Technology
 
-### **Sentence Transformers**
-- `all-MiniLM-L6-v2` model for semantic embeddings
-- 384-dimensional vectors for true meaning understanding
-- Handles synonyms, context, and semantic relationships
-
-### **ChromaDB Vector Database**
-- Persistent vector storage with HNSW indexing
-- Cosine similarity search for accurate retrieval
-- Survives server restarts (not just session-based)
-
-### **Multi-Agent System**
-- **CoordinatorAgent**: Orchestrates workflow
-- **IngestionAgent**: Document parsing and chunking
-- **RetrievalAgent**: Semantic similarity search
-- **LLMResponseAgent**: AI response generation
+- **Sentence Transformers** - all-MiniLM-L6-v2 model (384d embeddings)
+- **Semantic Search** - Cosine similarity with modern embeddings
+- **Multi-Agent System** - Coordinator, Ingestion, Retrieval, LLM agents
+- **Google Gemini** - AI response generation
+- **Smart Chunking** - Intelligent document processing
 
 ## 🚀 Quick Start
 
-1. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+# Install dependencies
+pip install -r requirements.txt
 
-2. **Set up API key:**
-   ```bash
-   echo "GEMINI_API_KEY=your_api_key_here" > .env
-   ```
+# Add API key
+echo "GEMINI_API_KEY=your_key_here" > .env
 
-3. **Run the application:**
-   ```bash
-   python app.py
-   ```
+# Run app
+python app.py
 
-4. **Open browser:** `http://localhost:5000`
+# Open browser
+http://localhost:5000
+```bash
+# Set environment variables
+OPENAI_API_KEY=your_openai_key
+GEMINI_API_KEY=your_gemini_key
+
+# Deploy automatically via GitHub
+```
+
+### **Local Development**
+```bash
+# Install dependencies
+pip install -r requirements.txt
+pip install sentence-transformers chromadb torch
+
+# Add API keys to .env file
+echo "GEMINI_API_KEY=your_gemini_key" > .env
+
+# Run local version with full features
+cd flask_app
+python app.py
+
+# Open browser
+http://localhost:5000
+```
 
 ## 💡 How It Works
 

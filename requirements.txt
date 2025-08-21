@@ -14,6 +14,4 @@ numpy
 scikit-learn
 scipy
 sentence-transformers
-chromadb
 torch
-transformers
