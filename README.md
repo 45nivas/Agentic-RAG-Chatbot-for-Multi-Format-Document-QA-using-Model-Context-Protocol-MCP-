@@ -1,6 +1,6 @@
 # Multi-Agent RAG Chatbot
 
-[![Live Demo](https://img.shields.io/badge/🌐%20Live%20Demo-Click%20Here-blue?style=for-the-badge)](https://rag-chatbot-8ykv.onrender.com/)
+[![Live Demo](https://img.shields.io/badge/🌐%20Live%20Demo-Click%20Here-blue?style=for-the-badge)](https://agentic-rag-chatbot-for-multi-format-jwlk.onrender.com/)
 
 ## 🚀 Smart Document Q&A Bot
 
@@ -16,13 +16,19 @@ Professional RAG system with dual deployment strategy for development and produc
 - **Sub-3 second responses**
 - **Professional UI** with modern design
 
-## 🏗️ Dual Architecture
+## 🏗️ Triple Architecture
 
-### **Local Development** (`flask_app/app.py`)
-- **Sentence Transformers** - all-MiniLM-L6-v2 model (384d embeddings)
-- **ChromaDB** - Persistent vector storage with HNSW indexing
-- **Full AI Features** - Complete semantic understanding
-- **Multi-Agent MCP** - Advanced agent communication
+### **Efficient Advanced** (`flask_app/app_efficient.py`) - **RECOMMENDED** ⭐
+- **LangChain Integration** - Modern AI framework (150 lines only!)
+- **HuggingFace Embeddings** - Efficient sentence transformers
+- **ChromaDB** - Persistent vector storage
+- **Smart Processing** - Automatic chunking & embedding
+
+### **Full Advanced** (`flask_app/app.py`)
+- **Sentence Transformers** - Complete implementation (800 lines)
+- **ChromaDB** - Full featured with HNSW indexing
+- **Multi-Agent MCP** - Enterprise architecture
+- **Advanced Processing** - Comprehensive document handling
 
 ### **Production Deployment** (`app.py`)
 - **Optimized TF-IDF** - Enhanced with bigrams and better parameters
@@ -32,17 +38,21 @@ Professional RAG system with dual deployment strategy for development and produc
 
 ## 🚀 Quick Start
 
-### **Local Development (Full AI Features)**
+### **Efficient Advanced (RECOMMENDED)** ⭐
 ```bash
-# Option 1: Use flask_app with complete AI suite
+# Modern LangChain approach - Only 150 lines!
+cd flask_app
+pip install -r requirements-efficient.txt
+echo "GEMINI_API_KEY=your_key" > ../.env
+python app_efficient.py
+```
+
+### **Full Advanced Development**
+```bash
+# Complete implementation - 800 lines with all features
 cd flask_app
 pip install -r requirements-dev.txt
 echo "GEMINI_API_KEY=your_key" > ../.env
-python app.py
-
-# Option 2: Use root directory with local AI
-pip install -r requirements-local.txt
-echo "GEMINI_API_KEY=your_key" > .env
 python app.py
 ```
 
