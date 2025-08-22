@@ -1,0 +1,42 @@
+# Development Environment Requirements
+# For running flask_app/app.py with full AI features
+# Install with: pip install -r requirements-dev.txt
+
+# Core Flask Framework
+Flask>=2.3.0
+python-dotenv>=1.0.0
+Werkzeug>=2.3.0
+gunicorn>=21.0.0
+
+# Modern AI/ML Stack - Complete Suite
+sentence-transformers>=2.2.0
+chromadb>=0.4.0
+torch>=2.0.0
+transformers>=4.30.0
+
+# Google Generative AI
+google-generativeai>=0.3.0
+
+# Document Processing - All 6 Formats
+PyPDF2>=3.0.0
+python-docx>=0.8.0
+python-pptx>=0.6.0
+
+# Scientific Computing
+numpy>=1.24.0
+scikit-learn>=1.3.0
+scipy>=1.10.0
+
+# Additional ML Libraries
+pandas>=2.0.0  # For CSV processing
+matplotlib>=3.7.0  # For visualizations
+seaborn>=0.12.0  # For advanced plots
+
+# Development & Debugging
+ipython>=8.0.0
+jupyter>=1.0.0
+rich>=13.0.0  # For beautiful terminal output
+
+# Security & Utils
+requests>=2.31.0
+urllib3>=2.0.0
