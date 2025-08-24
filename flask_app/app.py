@@ -5,22 +5,22 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
-# Modern AI Stack - ONLY Advanced Features (No TF-IDF!)
+# Advanced AI Stack - Sentence Transformers + ChromaDB (Professional Setup)
 try:
     from sentence_transformers import SentenceTransformer
     import chromadb
     from chromadb.config import Settings
     import numpy as np
-    ADVANCED_AI_AVAILABLE = True
-    print("✅ Advanced AI stack loaded - Sentence Transformers + ChromaDB ONLY")
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
+    print("✅ Sentence Transformers + ChromaDB - Full Advanced AI Stack!")
 except ImportError as e:
-    # Simplified ChromaDB only approach
+    # Fallback to ChromaDB only
     import chromadb
     from chromadb.config import Settings
     import numpy as np
-    ADVANCED_AI_AVAILABLE = False
-    print(f"⚠️ Using ChromaDB with simpler embeddings: {e}")
-    print("✅ ChromaDB initialized - Advanced vector storage ready")
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
+    print(f"⚠️ Fallback to ChromaDB embeddings: {e}")
+    print("✅ ChromaDB initialized with built-in embeddings")
 
 # Fallback imports REMOVED - Only modern AI
 import google.generativeai as genai
@@ -40,29 +40,36 @@ logger = logging.getLogger(__name__)
 
 # Configure Gemini
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+model = None
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-1.5-flash')
     logger.info("✅ Gemini AI configured")
+else:
+    logger.warning("⚠️ No GEMINI_API_KEY found - responses will be limited")
 
 class AdvancedRAG:
-    """ONLY Advanced AI - ChromaDB Vector Storage with Smart Embeddings (No old methods!)"""
+    """Professional RAG with Sentence Transformers + ChromaDB Vector Storage"""
     
     def __init__(self):
-        # Initialize embedding model - Advanced or fallback
-        try:
-            if ADVANCED_AI_AVAILABLE:
+        # Initialize advanced Sentence Transformers model
+        if SENTENCE_TRANSFORMERS_AVAILABLE:
+            try:
                 self.sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
-                self.embedding_dim = 384
-                logger.info("✅ Sentence Transformers loaded: all-MiniLM-L6-v2")
-            else:
-                raise ImportError("Fallback to ChromaDB defaults")
-        except Exception as e:
-            logger.warning(f"SentenceTransformers failed: {e}")
-            # Use ChromaDB's default embedding function
+                self.embedding_dim = 384  # MiniLM-L6-v2 output dimensions
+                logger.info("✅ Sentence Transformers loaded: all-MiniLM-L6-v2 (384D)")
+                self.use_sentence_transformers = True
+            except Exception as e:
+                logger.error(f"Failed to load Sentence Transformers: {e}")
+                self.sentence_model = None
+                self.embedding_dim = 768  # ChromaDB default
+                self.use_sentence_transformers = False
+                logger.info("✅ Fallback to ChromaDB built-in embeddings")
+        else:
             self.sentence_model = None
             self.embedding_dim = 768  # ChromaDB default
-            logger.info("✅ Using ChromaDB default embeddings")
+            self.use_sentence_transformers = False
+            logger.info("✅ Using ChromaDB built-in embeddings")
         
         # Initialize ChromaDB with persistence
         self.chroma_client = chromadb.PersistentClient(
@@ -114,18 +121,18 @@ class AdvancedRAG:
         return chunks
     
     def add_document(self, filename, content):
-        """Add document with Advanced Embeddings + ChromaDB"""
+        """Add document with Sentence Transformers or ChromaDB embeddings"""
         try:
             # Smart chunking
             chunks = self.smart_chunk(content, filename)
             
-            if self.sentence_model:
-                # Advanced: Generate embeddings using Sentence Transformers
+            # Prepare data for ChromaDB
+            chunk_ids = [f"{filename}_{i}" for i in range(len(chunks))]
+            metadatas = [{"filename": filename, "chunk_index": i} for i in range(len(chunks))]
+            
+            if self.use_sentence_transformers and self.sentence_model:
+                # Advanced: Use Sentence Transformers for high-quality embeddings
                 embeddings = self.sentence_model.encode(chunks)
-                
-                # Prepare data for ChromaDB
-                chunk_ids = [f"{filename}_{i}" for i in range(len(chunks))]
-                metadatas = [{"filename": filename, "chunk_index": i} for i in range(len(chunks))]
                 
                 # Store in ChromaDB with custom embeddings
                 self.collection.add(
@@ -143,12 +150,10 @@ class AdvancedRAG:
                         "filename": filename,
                         "embedding": embeddings[i]
                     })
-            else:
-                # Fallback: Use ChromaDB's default embedding function
-                chunk_ids = [f"{filename}_{i}" for i in range(len(chunks))]
-                metadatas = [{"filename": filename, "chunk_index": i} for i in range(len(chunks))]
                 
-                # Store in ChromaDB (will use default embeddings)
+                logger.info(f"✅ Added {len(chunks)} chunks with Sentence Transformers (384D) for {filename}")
+            else:
+                # Fallback: Use ChromaDB's default embeddings
                 self.collection.add(
                     documents=chunks,
                     metadatas=metadatas,
@@ -162,8 +167,9 @@ class AdvancedRAG:
                         "content": chunk,
                         "filename": filename
                     })
+                
+                logger.info(f"✅ Added {len(chunks)} chunks with ChromaDB built-in embeddings for {filename}")
             
-            logger.info(f"✅ Added {len(chunks)} chunks with Sentence Transformers + ChromaDB for {filename}")
             return True
             
         except Exception as e:
@@ -171,41 +177,46 @@ class AdvancedRAG:
             return False
     
     def search(self, query, k=3):
-        """Search using Advanced Embeddings + ChromaDB"""
+        """Search using Sentence Transformers or ChromaDB embeddings"""
         try:
-            if self.sentence_model:
+            if self.use_sentence_transformers and self.sentence_model:
                 # Advanced: Generate query embedding with Sentence Transformers
                 query_embedding = self.sentence_model.encode([query])
                 
-                # Search in ChromaDB
+                # Search in ChromaDB with custom embeddings
                 results = self.collection.query(
                     query_embeddings=query_embedding.tolist(),
-                    n_results=min(k, len(self.chunks)),
+                    n_results=k,
                     include=['documents', 'metadatas', 'distances']
                 )
+                
+                search_method = "Sentence Transformers (384D)"
             else:
                 # Fallback: Use ChromaDB's default query (will embed automatically)
                 results = self.collection.query(
                     query_texts=[query],
-                    n_results=min(k, len(self.chunks)),
+                    n_results=k,
                     include=['documents', 'metadatas', 'distances']
                 )
+                
+                search_method = "ChromaDB built-in"
             
             # Process results
             search_results = []
-            for doc, metadata, distance in zip(
-                results['documents'][0],
-                results['metadatas'][0], 
-                results['distances'][0]
-            ):
-                similarity = 1 - distance  # Convert distance to similarity
-                search_results.append({
-                    "content": doc,
-                    "filename": metadata['filename'],
-                    "similarity": float(similarity)
-                })
+            if results['documents'] and results['documents'][0]:
+                for doc, metadata, distance in zip(
+                    results['documents'][0],
+                    results['metadatas'][0], 
+                    results['distances'][0]
+                ):
+                    similarity = 1 - distance  # Convert distance to similarity
+                    search_results.append({
+                        "content": doc,
+                        "filename": metadata['filename'],
+                        "similarity": float(similarity)
+                    })
             
-            logger.info(f"🔍 Advanced search: {len(search_results)} results with Sentence Transformers")
+            logger.info(f"🔍 {search_method} search: {len(search_results)} results found")
             return search_results
             
         except Exception as e:
@@ -284,23 +295,36 @@ def upload():
             return jsonify({'error': 'No files processed'}), 400
             
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"❌ Chat endpoint error: {e}")
+        return jsonify({
+            'success': False,
+            'error': "Sorry, I encountered an error while processing your question.",
+            'method': 'Error fallback'
+        }), 500
 
 @app.route('/chat', methods=['POST'])
 def chat():
     """Efficient chat with modern AI"""
+    logger.info("📨 Chat request received")
     try:
         data = request.get_json()
+        logger.info(f"📨 Request data: {data}")
         question = data.get('message', '').strip()
+        logger.info(f"❓ Question: {question}")
         
         if not question:
+            logger.warning("⚠️ No question provided")
             return jsonify({'error': 'No question provided'}), 400
         
         # Efficient search
+        logger.info("🔍 Starting search...")
         results = rag.search(question)
+        logger.info(f"🔍 Search completed, found {len(results)} results")
         
         if not results:
+            logger.info("📭 No results found")
             return jsonify({
+                'success': True,
                 'response': "No relevant information found in documents.",
                 'method': 'No results'
             })
@@ -315,10 +339,17 @@ Question: {question}
 
 Provide a clear, helpful answer based on the context:"""
         
+        logger.info("🤖 Generating AI response...")
         try:
-            response = model.generate_content(prompt)
-            answer = response.text
-        except:
+            if model:
+                response = model.generate_content(prompt)
+                answer = response.text
+                logger.info(f"✅ Gemini response generated successfully")
+            else:
+                logger.warning("⚠️ No Gemini model available - using fallback")
+                answer = f"Based on the documents: {results[0]['content'][:400]}..."
+        except Exception as e:
+            logger.error(f"❌ Gemini API error: {e}")
             answer = f"Based on the documents: {results[0]['content'][:400]}..."
         
         # Update conversation
@@ -332,8 +363,9 @@ Provide a clear, helpful answer based on the context:"""
         })
         
         return jsonify({
+            'success': True,
             'response': answer,
-            'method': 'Sentence Transformers + ChromaDB + Gemini',
+            'method': 'Sentence Transformers + ChromaDB + Gemini' if rag.use_sentence_transformers else 'ChromaDB + Gemini',
             'sources': [r['filename'] for r in results],
             'similarity': round(results[0]['similarity'], 3) if results else 0
         })
