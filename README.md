@@ -16,13 +16,7 @@ Professional RAG system with dual deployment strategy for development and produc
 - **Sub-3 second responses**
 - **Professional UI** with modern design
 
-## 🏗️ Triple Architecture
-
-### **Efficient Advanced** (`flask_app/app_efficient.py`) - **RECOMMENDED** ⭐
-- **LangChain Integration** - Modern AI framework (150 lines only!)
-- **HuggingFace Embeddings** - Efficient sentence transformers
-- **ChromaDB** - Persistent vector storage
-- **Smart Processing** - Automatic chunking & embedding
+## 🏗️ double Architecture
 
 ### **Full Advanced** (`flask_app/app.py`)
 - **Sentence Transformers** - Complete implementation (800 lines)
@@ -38,14 +32,6 @@ Professional RAG system with dual deployment strategy for development and produc
 
 ## 🚀 Quick Start
 
-### **Efficient Advanced (RECOMMENDED)** ⭐
-```bash
-# Modern LangChain approach - Only 150 lines!
-cd flask_app
-pip install -r requirements-efficient.txt
-echo "GEMINI_API_KEY=your_key" > ../.env
-python app_efficient.py
-```
 
 ### **Full Advanced Development**
 ```bash
