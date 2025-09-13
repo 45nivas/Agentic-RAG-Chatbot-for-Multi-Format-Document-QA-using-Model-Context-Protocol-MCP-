@@ -17,6 +17,7 @@ const micSpinner = document.getElementById('micSpinner');
 const voiceStatus = document.getElementById('voiceStatus');
 const voiceStatusText = document.getElementById('voiceStatusText');
 const clearBtn = document.getElementById('clearBtn');
+const clearDataBtn = document.getElementById('clearDataBtn');
 const chatContainer = document.getElementById('chatContainer');
 const statusModal = document.getElementById('statusModal');
 const modalTitle = document.getElementById('modalTitle');
@@ -44,6 +45,7 @@ function initializeEventListeners() {
     sendBtn.addEventListener('click', sendMessage);
     micBtn.addEventListener('click', toggleVoiceInput);
     clearBtn.addEventListener('click', clearConversation);
+    clearDataBtn.addEventListener('click', clearAllData);
     
     // Focus management
     chatInput.addEventListener('focus', scrollToBottom);
@@ -427,6 +429,59 @@ async function clearConversation() {
     } catch (error) {
         console.error('Clear error:', error);
         showErrorMessage('Failed to clear conversation');
+    }
+}
+
+// Clear all data - documents and conversation
+async function clearAllData() {
+    if (isProcessing) return;
+    
+    if (!confirm('⚠️ This will clear ALL previous documents and chat history. Are you sure?')) {
+        return;
+    }
+    
+    try {
+        // Show loading state
+        clearDataBtn.innerHTML = '⏳ Clearing...';
+        clearDataBtn.disabled = true;
+        
+        const response = await fetch('/clear', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            // Clear UI state
+            uploadedFiles = [];
+            updateFileList();
+            hideUploadedFiles();
+            
+            // Clear chat
+            chatContainer.innerHTML = '';
+            addMessage('bot', '✅ All data cleared! Upload new documents to get started.');
+            
+            // Update UI state
+            chatInput.disabled = true;
+            sendBtn.disabled = true;
+            micBtn.disabled = true;
+            chatInput.placeholder = "Upload documents to start asking questions...";
+            
+            // Show success message
+            showModal('Success', 'All previous data cleared successfully!', false);
+            setTimeout(() => hideModal(), 2000);
+        } else {
+            const errorMsg = result.error || result.message || 'Failed to clear data';
+            console.error('Clear failed:', result);
+            showErrorMessage(`Clear failed: ${errorMsg}`);
+        }
+    } catch (error) {
+        console.error('Clear data error:', error);
+        showErrorMessage('Failed to clear data');
+    } finally {
+        // Restore button state
+        clearDataBtn.innerHTML = '🗑️ Clear Previous Data';
+        clearDataBtn.disabled = false;
     }
 }
 

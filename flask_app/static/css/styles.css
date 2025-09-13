@@ -719,6 +719,47 @@ body {
     height: 16px;
 }
 
+/* Clear Data Button */
+.clear-data-btn {
+    background: rgba(234, 88, 12, 0.1);
+    color: #ea580c;
+    border: 1px solid rgba(234, 88, 12, 0.2);
+    padding: 0.6rem 1.2rem;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: inherit;
+    outline: none;
+}
+
+.clear-data-btn:hover {
+    background: rgba(234, 88, 12, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3);
+    border-color: rgba(234, 88, 12, 0.4);
+}
+
+.clear-data-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(234, 88, 12, 0.2);
+}
+
+/* Upload Controls Container */
+.upload-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.upload-controls .upload-stats {
+    margin: 0;
+}
+
 /* Modal */
 .modal {
     position: fixed;

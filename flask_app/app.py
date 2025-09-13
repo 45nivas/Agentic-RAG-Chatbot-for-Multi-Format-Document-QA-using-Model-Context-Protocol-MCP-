@@ -12,7 +12,8 @@ try:
     from chromadb.config import Settings
     import numpy as np
     SENTENCE_TRANSFORMERS_AVAILABLE = True
-    print("✅ Sentence Transformers + ChromaDB - Full Advanced AI Stack!")
+    print("✅ Sentence Transformers + ChromaDB - Advanced AI Stack!")
+        
 except ImportError as e:
     # Fallback to ChromaDB only
     import chromadb
@@ -49,7 +50,7 @@ else:
     logger.warning("⚠️ No GEMINI_API_KEY found - responses will be limited")
 
 class AdvancedRAG:
-    """Professional RAG with Sentence Transformers + ChromaDB Vector Storage"""
+    """Professional RAG with Sentence Transformers + ChromaDB"""
     
     def __init__(self):
         # Initialize advanced Sentence Transformers model
@@ -59,6 +60,7 @@ class AdvancedRAG:
                 self.embedding_dim = 384  # MiniLM-L6-v2 output dimensions
                 logger.info("✅ Sentence Transformers loaded: all-MiniLM-L6-v2 (384D)")
                 self.use_sentence_transformers = True
+                    
             except Exception as e:
                 logger.error(f"Failed to load Sentence Transformers: {e}")
                 self.sentence_model = None
@@ -89,6 +91,14 @@ class AdvancedRAG:
             logger.info("✅ Created new ChromaDB collection with HNSW indexing")
         
         self.chunks = []  # Keep track of chunks
+        
+        # Initialize Gemini
+        self.gemini_client = None
+        if os.getenv('GEMINI_API_KEY'):
+            genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
+            self.gemini_client = genai.GenerativeModel('gemini-1.5-flash-002')
+            logger.info("✅ Gemini AI initialized")
+        
         logger.info("🚀 Advanced RAG initialized - ONLY modern AI!")
     
     def smart_chunk(self, text, filename, chunk_size=400, overlap=50):
@@ -121,7 +131,122 @@ class AdvancedRAG:
         return chunks
     
     def add_document(self, filename, content):
-        """Add document with Sentence Transformers or ChromaDB embeddings"""
+        """Add document chunks to vector store"""
+        logger.info(f"� Processing document: {filename}")
+        
+        # Smart chunking for better comprehension
+        chunks = self.smart_chunk(content, filename)
+        logger.info(f"📝 Created {len(chunks)} smart chunks")
+        
+        if not chunks:
+            logger.error("❌ No chunks created from document")
+            return False
+        
+        try:
+            # Get embeddings if Sentence Transformers available
+            embeddings = None
+            if self.use_sentence_transformers and self.sentence_model:
+                embeddings = self.sentence_model.encode(chunks)
+            
+            # Prepare metadata
+            metadatas = [{
+                'filename': filename,
+                'chunk_id': i,
+                'total_chunks': len(chunks)
+            } for i in range(len(chunks))]
+            
+            # Generate unique IDs
+            ids = [f"{filename}_chunk_{i}" for i in range(len(chunks))]
+            
+            # Add to ChromaDB
+            if embeddings is not None:
+                self.collection.add(
+                    documents=chunks,
+                    embeddings=embeddings.tolist(),
+                    metadatas=metadatas,
+                    ids=ids
+                )
+                logger.info(f"✅ Added {len(chunks)} chunks with Sentence Transformers embeddings")
+            else:
+                # Let ChromaDB handle embeddings
+                self.collection.add(
+                    documents=chunks,
+                    metadatas=metadatas,
+                    ids=ids
+                )
+                logger.info(f"✅ Added {len(chunks)} chunks with ChromaDB embeddings")
+            
+            # Store chunks locally
+            for i, chunk in enumerate(chunks):
+                self.chunks.append({
+                    'content': chunk,
+                    'filename': filename,
+                    'chunk_id': i
+                })
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to add document: {e}")
+            return False
+    
+    def query(self, query_text, top_k=5):
+        """Advanced RAG query with semantic search"""
+        logger.info(f"🔍 Advanced Query: {query_text[:100]}...")
+        
+        try:
+            # Search ChromaDB
+            if self.use_sentence_transformers and self.sentence_model:
+                # Use Sentence Transformers for query embedding
+                query_embedding = self.sentence_model.encode([query_text])
+                results = self.collection.query(
+                    query_embeddings=query_embedding.tolist(),
+                    n_results=top_k,
+                    include=['documents', 'metadatas', 'distances']
+                )
+            else:
+                # Use ChromaDB's built-in embeddings
+                results = self.collection.query(
+                    query_texts=[query_text],
+                    n_results=top_k,
+                    include=['documents', 'metadatas', 'distances']
+                )
+            
+            # Extract and format results
+            if not results['documents'] or not results['documents'][0]:
+                logger.warning("❌ No relevant documents found")
+                return [], "No relevant information found"
+            
+            # Format context
+            context_chunks = []
+            for i, (doc, metadata, distance) in enumerate(zip(
+                results['documents'][0], 
+                results['metadatas'][0], 
+                results['distances'][0]
+            )):
+                context_chunks.append({
+                    'content': doc,
+                    'filename': metadata.get('filename', 'unknown'),
+                    'chunk_id': metadata.get('chunk_id', i),
+                    'similarity': 1 - distance  # Convert distance to similarity
+                })
+            
+            # Generate context string for AI
+            context = "\n\n".join([
+                f"[{chunk['filename']} - Chunk {chunk['chunk_id']}]\n{chunk['content']}"
+                for chunk in context_chunks
+            ])
+            
+            logger.info(f"✅ Found {len(context_chunks)} relevant chunks (avg similarity: {np.mean([c['similarity'] for c in context_chunks]):.3f})")
+            
+            return context_chunks, context
+            
+        except Exception as e:
+            logger.error(f"❌ Query failed: {e}")
+            return [], "Error occurred during search"
+
+    def add_document_legacy(self, filename, content):
+        """Legacy add document with Sentence Transformers or ChromaDB embeddings"""
         try:
             # Smart chunking
             chunks = self.smart_chunk(content, filename)
@@ -262,8 +387,30 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    """Efficient upload processing"""
+    """Efficient upload processing with database clearing"""
     try:
+        # Clear the database and conversation before adding new documents
+        logger.info("🗑️ Clearing database before adding new documents...")
+        try:
+            # Clear the session/conversation
+            session.clear()
+            
+            # Delete existing ChromaDB collection
+            rag.collection.delete()
+            
+            # Create a fresh collection
+            rag.collection = rag.chroma_client.create_collection(
+                name="documents",
+                metadata={"hnsw:space": "cosine"}
+            )
+            
+            # Clear local chunks
+            rag.chunks = []
+            
+            logger.info("✅ Database and conversation cleared successfully")
+        except Exception as e:
+            logger.warning(f"⚠️ Error clearing database: {e}")
+        
         files = request.files.getlist('files')
         processed = []
         
@@ -287,9 +434,10 @@ def upload():
         if processed:
             return jsonify({
                 'success': True,
-                'message': f'Processed {len(processed)} files with Sentence Transformers + ChromaDB',
+                'message': f'Database cleared and processed {len(processed)} files with Sentence Transformers + ChromaDB',
                 'files': processed,
-                'method': 'Advanced AI Only'
+                'method': 'Advanced AI Only - Fresh Database',
+                'cleared': True
             })
         else:
             return jsonify({'error': 'No files processed'}), 400
@@ -377,21 +525,67 @@ Provide a clear, helpful answer based on the context:"""
 @app.route('/clear', methods=['POST'])
 def clear():
     """Clear conversation and documents - Advanced AI only"""
-    session.clear()
-    
-    # Clear ChromaDB collection
     try:
-        rag.collection.delete()
-        rag.collection = rag.chroma_client.create_collection(
-            name="documents",
-            metadata={"hnsw:space": "cosine"}
-        )
+        # Clear session/conversation
+        session.clear()
+        logger.info("✅ Session cleared")
+        
+        # Clear ChromaDB collection
+        try:
+            # Try to delete the existing collection
+            rag.collection.delete()
+            logger.info("✅ ChromaDB collection deleted")
+        except Exception as delete_error:
+            logger.warning(f"⚠️ Collection delete warning: {delete_error}")
+            # This is okay - collection might not exist
+        
+        # Create a fresh collection - handle if it already exists
+        try:
+            # Try to delete the collection by name first
+            try:
+                rag.chroma_client.delete_collection(name="documents")
+                logger.info("✅ Collection deleted by name")
+            except Exception:
+                logger.info("ℹ️ Collection didn't exist to delete")
+            
+            # Now create a fresh collection
+            rag.collection = rag.chroma_client.create_collection(
+                name="documents",
+                metadata={"hnsw:space": "cosine"}
+            )
+            logger.info("✅ New ChromaDB collection created")
+        except Exception as create_error:
+            # If it still exists, just get it and clear it
+            logger.warning(f"⚠️ Create failed, getting existing collection: {create_error}")
+            try:
+                rag.collection = rag.chroma_client.get_collection("documents")
+                # Clear all documents from the collection
+                all_docs = rag.collection.get()
+                if all_docs['ids']:
+                    rag.collection.delete(ids=all_docs['ids'])
+                logger.info("✅ Existing collection cleared")
+            except Exception as fallback_error:
+                logger.error(f"❌ Fallback also failed: {fallback_error}")
+                raise Exception(f"Could not clear collection: {fallback_error}")
+        
+        # Clear local chunks
         rag.chunks = []
-        logger.info("✅ Cleared ChromaDB and conversation")
+        logger.info("✅ Local chunks cleared")
+        
+        logger.info("🎉 Successfully cleared all data")
+        return jsonify({
+            'success': True, 
+            'message': 'All data cleared successfully',
+            'details': 'ChromaDB collection recreated and conversation cleared'
+        })
+        
     except Exception as e:
-        logger.error(f"Clear error: {e}")
-    
-    return jsonify({'success': True, 'message': 'Cleared successfully'})
+        logger.error(f"❌ Critical clear error: {e}")
+        return jsonify({
+            'success': False, 
+            'error': f'Failed to clear data: {str(e)}',
+            'message': 'Clear operation failed'
+        }), 500
 
 if __name__ == '__main__':
     logger.info("🚀 Advanced RAG starting - ONLY Sentence Transformers + ChromaDB!")
