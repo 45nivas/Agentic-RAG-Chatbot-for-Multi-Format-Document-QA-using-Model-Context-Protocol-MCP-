@@ -44,7 +44,7 @@ GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 model = None
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('models/gemini-2.5-flash')
     logger.info("✅ Gemini AI configured")
 else:
     logger.warning("⚠️ No GEMINI_API_KEY found - responses will be limited")
@@ -96,7 +96,7 @@ class AdvancedRAG:
         self.gemini_client = None
         if os.getenv('GEMINI_API_KEY'):
             genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
-            self.gemini_client = genai.GenerativeModel('gemini-1.5-flash-002')
+            self.gemini_client = genai.GenerativeModel('models/gemini-2.5-flash')
             logger.info("✅ Gemini AI initialized")
         
         logger.info("🚀 Advanced RAG initialized - ONLY modern AI!")

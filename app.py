@@ -56,8 +56,23 @@ model = None
 if GEMINI_API_KEY and GEMINI_API_KEY != 'your-gemini-api-key':
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        logger.info("✅ Gemini AI configured successfully with gemini-1.5-flash")
+        # Try multiple models in case quota varies
+        models_to_try = ['models/gemini-2.0-flash-exp', 'models/gemini-2.0-flash', 'models/gemini-2.5-flash']
+        
+        for model_name in models_to_try:
+            try:
+                model = genai.GenerativeModel(model_name)
+                # Quick test
+                test_response = model.generate_content("Hi")
+                logger.info(f"✅ Gemini AI configured successfully with {model_name}")
+                break
+            except Exception as model_error:
+                logger.warning(f"⚠️ Failed with {model_name}: {str(model_error)[:100]}")
+                continue
+        
+        if model is None:
+            logger.error("❌ All Gemini models failed - likely quota exceeded")
+            
     except Exception as e:
         logger.error(f"❌ Failed to configure Gemini AI: {str(e)}")
         model = None
@@ -633,8 +648,23 @@ Provide a detailed, accurate answer based on the context. If the information isn
                 logger.info("Successfully generated professional RAG response")
                 
             except Exception as e:
-                logger.error(f"Gemini API error: {str(e)}")
-                ai_response = f"Professional RAG system processed your query with {len(relevant_contexts)} relevant chunks (similarity: {avg_similarity:.1%}), but encountered an API issue. Please try again."
+                error_msg = str(e)
+                logger.error(f"Gemini API error: {error_msg}")
+                
+                # Check if quota exceeded
+                if "429" in error_msg or "quota" in error_msg.lower():
+                    ai_response = "🚫 Daily AI quota exceeded. Here's the most relevant content from your documents:\n\n"
+                    if relevant_contexts:
+                        ai_response += relevant_contexts[0]['content'][:800]
+                    else:
+                        ai_response += "Please try again tomorrow or upgrade your API plan."
+                else:
+                    # Other API errors - provide fallback content
+                    if relevant_contexts:
+                        best_context = relevant_contexts[0]['content'][:500]
+                        ai_response = f"Based on your documents: {best_context}..." if len(best_context) == 500 else f"Based on your documents: {best_context}"
+                    else:
+                        ai_response = "I found your documents but couldn't process your question. Please try rephrasing it."
         elif not model:
             ai_response = f"I can see you've uploaded {len(uploaded_files)} file(s) including '{uploaded_files[0]['filename']}'. The AI service is currently being configured. Please try again in a moment."
         else:
