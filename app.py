@@ -51,18 +51,18 @@ else:
     logger.warning("Agents not available, using direct implementation")
 
 # Professional RAG System - Lightweight Implementation
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyCyuSLpjW7e7z4tmWcqHzg5dNQTmlzEqGc')
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 model = None
 if GEMINI_API_KEY and GEMINI_API_KEY != 'your-gemini-api-key':
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         model = genai.GenerativeModel('gemini-1.5-flash')
-        logger.info("Gemini AI configured successfully with gemini-1.5-flash")
+        logger.info("✅ Gemini AI configured successfully with gemini-1.5-flash")
     except Exception as e:
-        logger.error(f"Failed to configure Gemini AI: {str(e)}")
+        logger.error(f"❌ Failed to configure Gemini AI: {str(e)}")
         model = None
 else:
-    logger.warning("No valid Gemini API key found")
+    logger.warning("⚠️ No valid Gemini API key found in environment variables")
 
 # Production-Optimized Vector Database - Lightweight for Cloud Deployment
 class ModernVectorDB:
