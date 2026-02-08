@@ -19,3 +19,6 @@ chroma_db/
 .cache/
 models/
 sentence_transformers_cache/
+
+venv/
+.venv/

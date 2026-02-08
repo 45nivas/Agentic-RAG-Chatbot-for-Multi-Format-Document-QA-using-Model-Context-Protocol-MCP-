@@ -14,7 +14,7 @@ import io
 import numpy as np
 
 # Production-Ready Components - Lightweight for Render Deployment
-# Using optimized TF-IDF for reliable cloud deployment within memory limits
+# Using optimized TF-IDF for reliable cloud deployment within memory limits 
 
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -93,8 +93,8 @@ class ModernVectorDB:
             max_features=2000,  # Increased for better accuracy
             stop_words='english',
             ngram_range=(1, 2),  # Include bigrams for context
-            max_df=0.8,  # Filter common words
-            min_df=2,    # Filter rare words
+            max_df=0.95,  # Filter very common words
+            min_df=1,    # Allow rare words (needed for small docs)
             sublinear_tf=True,  # Better scaling
             use_idf=True
         )
@@ -223,140 +223,14 @@ class ModernVectorDB:
                         }
                     })
             
-            logger.info(f"Search returned {len(results)} results with avg similarity: {np.mean([r['similarity'] for r in results]):.3f}")
+            if results:
+                logger.info(f"Search returned {len(results)} results with avg similarity: {np.mean([r['similarity'] for r in results]):.3f}")
+            else:
+                logger.info("Search returned 0 results")
             return results
             
         except Exception as e:
             logger.error(f"Search error: {e}")
-            return []
-
-# Document Processing Utilities
-        for idx in top_indices:
-            similarity = similarities[idx]
-            if similarity > threshold and idx < len(self.chunks):
-                chunk = self.chunks[idx]
-                results.append({
-                    'content': chunk['content'],
-                    'filename': chunk['filename'],
-                    'similarity': float(similarity),
-                    'chunk_id': chunk['id']
-                })
-        
-        return results
-    
-    def _search_tfidf(self, query, top_k, threshold):
-        """Fallback search using TF-IDF"""
-        if not self.fitted:
-            return []
-        
-        # Transform query
-        query_vector = self.vectorizer.transform([query])
-        
-        # Calculate similarities
-        similarities = cosine_similarity(query_vector, self.vectors)[0]
-        
-        # Get top results
-        top_indices = np.argsort(similarities)[-top_k:][::-1]
-        
-        results = []
-        for idx in top_indices:
-            similarity = similarities[idx]
-            if similarity > threshold and idx < len(self.chunks):
-                chunk = self.chunks[idx]
-                results.append({
-                    'content': chunk['content'],
-                    'filename': chunk['filename'],
-                    'similarity': float(similarity),
-                    'chunk_id': chunk['id']
-                })
-        
-        return results
-    
-    def semantic_chunk_text(self, text, chunk_size=300, overlap=50):
-        """Advanced semantic text chunking optimized for embeddings"""
-        # Split by sentences first for better semantic boundaries
-        sentences = text.replace('\n', ' ').split('. ')
-        
-        chunks = []
-        current_chunk = ""
-        word_count = 0
-        
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if not sentence:
-                continue
-                
-            sentence_words = len(sentence.split())
-            
-            # If adding this sentence would exceed chunk_size, save current chunk
-            if word_count + sentence_words > chunk_size and current_chunk:
-                chunks.append(current_chunk.strip())
-                # Start new chunk with overlap
-                overlap_words = current_chunk.split()[-overlap:]
-                current_chunk = ' '.join(overlap_words) + ' ' + sentence
-                word_count = len(overlap_words) + sentence_words
-            else:
-                current_chunk += ' ' + sentence
-                word_count += sentence_words
-        
-        # Add the last chunk
-        if current_chunk.strip():
-            chunks.append(current_chunk.strip())
-        
-        return chunks
-    
-    def search(self, query, top_k=5):
-        """Modern semantic search using sentence transformers"""
-        if not self.chunks or not self.embedding_model:
-            return []
-        
-        try:
-            # First try ChromaDB search
-            if self.collection:
-                query_embedding = self.embedding_model.encode([query]).tolist()
-                results = self.collection.query(
-                    query_embeddings=query_embedding,
-                    n_results=min(top_k, len(self.chunks))
-                )
-                
-                search_results = []
-                if results['documents'] and results['documents'][0]:
-                    for i, doc in enumerate(results['documents'][0]):
-                        distance = results['distances'][0][i] if results['distances'] else 0
-                        metadata = results['metadatas'][0][i] if results['metadatas'] else {}
-                        
-                        search_results.append({
-                            'content': doc,
-                            'similarity': 1 - distance,  # Convert distance to similarity
-                            'metadata': metadata
-                        })
-                
-                logger.info(f"ChromaDB search returned {len(search_results)} results")
-                return search_results
-            
-            # Fallback to in-memory search
-            query_embedding = self.embedding_model.encode([query])
-            
-            # Calculate similarities using embeddings
-            similarities = cosine_similarity(query_embedding, self.vectors)[0]
-            
-            # Get top results
-            top_indices = np.argsort(similarities)[-top_k:][::-1]
-            
-            results = []
-            for idx in top_indices:
-                if similarities[idx] > 0.2:  # Higher threshold for semantic similarity
-                    results.append({
-                        'content': self.chunks[idx],
-                        'similarity': similarities[idx],
-                        'metadata': self.metadata[idx]
-                    })
-            
-            logger.info(f"Semantic search returned {len(results)} results")
-            return results
-            
-        except Exception as e:
-            logger.error(f"Semantic search failed: {str(e)}")
             return []
 
 # Initialize Modern Professional Components
@@ -729,27 +603,21 @@ def health():
     try:
         has_files = 'uploaded_files' in session and len(session['uploaded_files']) > 0
         
-        # Check modern capabilities
-        embedding_available = vector_db and vector_db.embedding_model is not None
-        chromadb_available = vector_db and vector_db.collection is not None
-        
         return jsonify({
             'status': 'healthy',
-            'service': 'Modern Agentic RAG System with Sentence Transformers',
+            'service': 'Agentic RAG System with TF-IDF',
             'has_files': has_files,
             'ai_enabled': bool(model),
             'vector_db_enabled': bool(vector_db),
-            'sentence_transformers_enabled': embedding_available,
-            'chromadb_enabled': chromadb_available,
+            'vector_db_fitted': vector_db.fitted if vector_db else False,
             'multi_agent_enabled': AGENTS_AVAILABLE,
-            'rag_mode': 'semantic_embeddings' if embedding_available else 'fallback',
+            'rag_mode': 'tfidf_production',
             'features': [
-                'semantic_search', 
-                'sentence_transformers', 
-                'chromadb_storage',
+                'tfidf_search', 
                 'multi_agent_coordination',
                 'advanced_chunking',
-                'voice_input'
+                'voice_input',
+                '6_file_formats'
             ],
             'timestamp': datetime.now().isoformat(),
             'version': '3.0.0'
@@ -764,15 +632,6 @@ def favicon():
         return app.send_static_file('favicon.ico')
     except:
         return '', 204
-
-@app.route('/health')
-def health_check():
-    """Health check endpoint for Docker and cloud deployments"""
-    return jsonify({
-        'status': 'healthy',
-        'timestamp': datetime.now().isoformat(),
-        'version': '1.0.0'
-    }), 200
 
 if __name__ == '__main__':
     # Production-ready server configuration
