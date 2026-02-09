@@ -13,7 +13,7 @@ if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY not found in environment variables. Please check your .env file.")
 
 class LLMClient:
-    def __init__(self, model: str = "gemini-1.5-flash"):
+    def __init__(self, model: str = "gemini-2.5-flash"):
         genai.configure(api_key=GEMINI_API_KEY)
         self.model = model
         self.gemini = genai.GenerativeModel(model)
@@ -118,18 +118,16 @@ class LLMResponseAgent:
         self.client = LLMClient()
     
     def generate_response(self, context: List[str], query: str, threshold_met: bool = True, max_similarity: float = 0.0) -> MCPMessage:
-        # If similarity is very low (below 15%), use the safety response
-        if not threshold_met:
-            response_text = """I apologize, but your question doesn't seem to be closely related to the content in your uploaded documents. 
+        # If we have context, always try to answer - even with low similarity
+        # The LLM can determine relevance better than a hard threshold
+        if not context or (not threshold_met and max_similarity < 0.02):
+            response_text = """I couldn't find relevant information in your uploaded documents for this question.
 
-To get better results, try asking questions that are more specific to the document content, such as:
+Try asking questions specific to the document content, such as:
 • "What are the main topics discussed?"
 • "Can you summarize the key points?"
-• "What conclusions or recommendations are mentioned?"
-
-If you believe your question should be answerable from the documents, try rephrasing it to be more specific."""
-        # If similarity is low but above threshold (15-40%), try to answer but with a disclaimer
-        elif max_similarity < 0.4:
+• "What conclusions or recommendations are mentioned?"""
+        elif max_similarity < 0.15:
             enhanced_prompt = f"""Based on the available document content, I'll try to answer your question, though the relevance might be limited.
 
 Context from documents:

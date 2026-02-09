@@ -8,10 +8,13 @@ class RetrievalAgent:
     embedder: Any = None
     vector_store: Any = None
 
-    def embed_and_retrieve(self, chunks: List[str], query: str, top_k: int = 3, similarity_threshold: float = 0.15) -> MCPMessage:
+    def embed_and_retrieve(self, chunks: List[str], query: str, top_k: int = 3, similarity_threshold: float = 0.05) -> MCPMessage:
         try:
             if self.vector_store is None:
                 self.vector_store = EmbeddingStore()
+            
+            # Only add chunks if new ones are provided
+            if chunks:
                 self.vector_store.add_chunks(chunks)
             
             query_results = self.vector_store.query(query, top_k)
