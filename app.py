@@ -27,9 +27,11 @@ try:
     from agents.ingestion_agent import IngestionAgent
     from agents.retrieval_agent import RetrievalAgent
     from agents.llm_response_agent import LLMResponseAgent
+    from agents.document_utils import parse_document
     AGENTS_AVAILABLE = True
 except ImportError as e:
     AGENTS_AVAILABLE = False
+    parse_document = None
 
 load_dotenv()
 
@@ -79,184 +81,31 @@ if GEMINI_API_KEY and GEMINI_API_KEY != 'your-gemini-api-key':
 else:
     logger.warning("⚠️ No valid Gemini API key found in environment variables")
 
-# Production-Optimized Vector Database - Lightweight for Cloud Deployment
-class ModernVectorDB:
-    """Professional TF-IDF implementation optimized for production deployment"""
-    
-    def __init__(self):
-        self.documents = []
-        self.chunks = []
-        self.metadata = []
-        
-        # Enhanced TF-IDF with better parameters for semantic understanding
-        self.vectorizer = TfidfVectorizer(
-            max_features=2000,  # Increased for better accuracy
-            stop_words='english',
-            ngram_range=(1, 2),  # Include bigrams for context
-            max_df=0.95,  # Filter very common words
-            min_df=1,    # Allow rare words (needed for small docs)
-            sublinear_tf=True,  # Better scaling
-            use_idf=True
-        )
-        self.vectors = None
-        self.fitted = False
-        
-        logger.info("Production Vector Database initialized with optimized TF-IDF")
-        
-    def add_document(self, filename, text_content):
-        """Add document with professional chunking and indexing"""
-        try:
-            # Professional semantic chunking
-            chunks = self.professional_chunk_text(text_content)
-            
-            # Store document metadata
-            doc_id = len(self.documents)
-            self.documents.append({
-                'id': doc_id,
-                'filename': filename,
-                'content': text_content,
-                'chunks_count': len(chunks)
-            })
-            
-            # Process chunks
-            for i, chunk in enumerate(chunks):
-                chunk_data = {
-                    'id': len(self.chunks),
-                    'content': chunk,
-                    'filename': filename,
-                    'doc_id': doc_id,
-                    'chunk_index': i
-                }
-                self.chunks.append(chunk_data)
-            
-            # Build optimized TF-IDF index
-            self._build_vector_index()
-            
-            logger.info(f"Added {len(chunks)} chunks with optimized indexing for {filename}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error adding document: {e}")
-            return False
-    
-    def professional_chunk_text(self, text, chunk_size=400, overlap=50):
-        """Professional chunking with sentence boundary respect"""
-        import re
-        
-        # Split by sentences and paragraphs
-        sentences = re.split(r'[.!?]+|\n\n+', text)
-        chunks = []
-        current_chunk = ""
-        current_length = 0
-        
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if not sentence:
-                continue
-                
-            words = sentence.split()
-            sentence_length = len(words)
-            
-            # Smart chunking with overlap
-            if current_length + sentence_length > chunk_size and current_chunk:
-                chunks.append(current_chunk.strip())
-                
-                # Create intelligent overlap
-                previous_words = current_chunk.split()
-                overlap_words = previous_words[-overlap:] if len(previous_words) > overlap else previous_words
-                current_chunk = " ".join(overlap_words) + " " + sentence
-                current_length = len(overlap_words) + sentence_length
-            else:
-                current_chunk += " " + sentence
-                current_length += sentence_length
-        
-        # Add final chunk
-        if current_chunk.strip():
-            chunks.append(current_chunk.strip())
-        
-        return chunks
-    
-    def _build_vector_index(self):
-        """Build optimized TF-IDF vectors for all chunks"""
-        try:
-            if not self.chunks:
-                return
-                
-            chunk_texts = [chunk['content'] for chunk in self.chunks]
-            self.vectors = self.vectorizer.fit_transform(chunk_texts)
-            self.fitted = True
-            
-            logger.info(f"Built optimized TF-IDF index with {len(chunk_texts)} chunks")
-            
-        except Exception as e:
-            logger.error(f"Vector indexing error: {e}")
-    
-    def search(self, query, top_k=5, threshold=0.15):
-        """Professional search with optimized TF-IDF"""
-        if not self.fitted or not self.chunks:
-            logger.warning("No index available for search")
-            return []
-        
-        try:
-            # Vectorize query with same parameters
-            query_vector = self.vectorizer.transform([query])
-            
-            # Calculate cosine similarities
-            similarities = cosine_similarity(query_vector, self.vectors)[0]
-            
-            # Get top results above threshold
-            top_indices = np.argsort(similarities)[-top_k:][::-1]
-            
-            results = []
-            for idx in top_indices:
-                similarity = similarities[idx]
-                if similarity > threshold and idx < len(self.chunks):
-                    chunk = self.chunks[idx]
-                    results.append({
-                        'content': chunk['content'],
-                        'filename': chunk['filename'],
-                        'similarity': float(similarity),
-                        'chunk_id': chunk['id'],
-                        'metadata': {
-                            'filename': chunk['filename'],
-                            'chunk_index': chunk['chunk_index']
-                        }
-                    })
-            
-            if results:
-                logger.info(f"Search returned {len(results)} results with avg similarity: {np.mean([r['similarity'] for r in results]):.3f}")
-            else:
-                logger.info("Search returned 0 results")
-            return results
-            
-        except Exception as e:
-            logger.error(f"Search error: {e}")
-            return []
-
-# Initialize Modern Professional Components
-try:
-    vector_db = ModernVectorDB()
-    logger.info("Modern Vector Database with SentenceTransformers initialized successfully")
-except Exception as e:
-    logger.error(f"Failed to initialize Modern Vector DB: {str(e)}")
-    vector_db = None
-
-# Initialize Multi-Agent System
+# Initialize Multi-Agent System with ChromaDB
 if AGENTS_AVAILABLE:
     try:
+        from agents.embedding_utils import EmbeddingStore
+        
         coordinator = CoordinatorAgent()
         ingestion_agent = IngestionAgent()
         retrieval_agent = RetrievalAgent()
         llm_agent = LLMResponseAgent()
-        logger.info("Multi-agent system initialized successfully")
+        
+        # Initialize shared vector store with ChromaDB
+        embedding_store = EmbeddingStore(persist_path="./chroma_render")
+        retrieval_agent.vector_store = embedding_store
+        
+        logger.info("✅ Multi-agent system with ChromaDB initialized")
     except Exception as e:
-        logger.error(f"Failed to initialize agents: {str(e)}")
+        logger.error(f"❌ Failed to initialize agents: {str(e)}")
         AGENTS_AVAILABLE = False
+        embedding_store = None
 else:
     coordinator = None
     ingestion_agent = None
     retrieval_agent = None
     llm_agent = None
+    embedding_store = None
 
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'pptx', 'csv', 'txt', 'md'}
@@ -269,113 +118,47 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def extract_text_from_file(filepath, filename):
-    """Extract text content from uploaded files"""
-    try:
-        file_ext = filename.rsplit('.', 1)[1].lower()
-        
-        if file_ext == 'pdf':
-            with open(filepath, 'rb') as file:
-                reader = PyPDF2.PdfReader(file)
-                text = ""
-                for page in reader.pages:
-                    text += page.extract_text() + "\n"
-                return text
-                
-        elif file_ext == 'docx':
-            doc = docx.Document(filepath)
-            text = ""
-            for paragraph in doc.paragraphs:
-                text += paragraph.text + "\n"
-            return text
-            
-        elif file_ext == 'pptx':
-            prs = Presentation(filepath)
-            text = ""
-            for slide in prs.slides:
-                for shape in slide.shapes:
-                    if hasattr(shape, "text"):
-                        text += shape.text + "\n"
-            return text
-            
-        elif file_ext == 'csv':
-            with open(filepath, 'r', encoding='utf-8') as file:
-                csv_reader = csv.reader(file)
-                rows = list(csv_reader)
-                # Convert CSV to readable text format
-                text = ""
-                for row in rows:
-                    text += " | ".join(row) + "\n"
-                return text
-            
-        elif file_ext in ['txt', 'md']:
-            with open(filepath, 'r', encoding='utf-8') as file:
-                return file.read()
-                
-    except Exception as e:
-        logger.error(f"Error extracting text from {filename}: {str(e)}")
-        return f"Error reading file: {str(e)}"
-    
-    return "Could not extract text from this file type."
-
-def chunk_text(text, chunk_size=500, overlap=50):
-    """Split text into overlapping chunks for better context"""
-    words = text.split()
-    chunks = []
-    for i in range(0, len(words), chunk_size - overlap):
-        chunk = ' '.join(words[i:i + chunk_size])
-        if chunk.strip():
-            chunks.append(chunk.strip())
-    return chunks
-
 def store_document_in_vector_db(filename, text_content):
-    """Store document in professional vector database"""
-    if not vector_db:
+    """Store document using RetrievalAgent + ChromaDB"""
+    if not embedding_store or not ingestion_agent:
         return False
     
     try:
-        success = vector_db.add_document(filename, text_content)
+        # Use IngestionAgent to parse and chunk
+        chunks = parse_document(filename) if parse_document else [text_content]
         
-        # Save to session for persistence
-        if success:
-            session['vector_chunks'] = vector_db.chunks
-            session.modified = True
-        
-        return success
-        
+        # Store in RetrievalAgent's ChromaDB
+        embedding_store.add_chunks(chunks)
+        logger.info(f"✅ Added {len(chunks)} chunks to ChromaDB for {filename}")
+        return True
     except Exception as e:
-        logger.error(f"Failed to store document in vector DB: {str(e)}")
+        logger.error(f"Storage failed: {str(e)}")
         return False
 
 def retrieve_relevant_context(query, top_k=5):
-    """Retrieve most relevant document chunks using professional vector similarity"""
-    if not vector_db:
+    """Retrieve using RetrievalAgent + ChromaDB"""
+    if not retrieval_agent:
         return []
     
     try:
-        # Restore chunks from session
-        if 'vector_chunks' in session and session['vector_chunks']:
-            vector_db.chunks = session['vector_chunks']
-            if vector_db.chunks and not vector_db.fitted:
-                vector_db._build_vector_index()
+        # Use RetrievalAgent to search
+        retrieval_msg = retrieval_agent.embed_and_retrieve([], query, top_k=top_k)
+        contexts = retrieval_msg.payload.get('retrieved_context', [])
+        similarities = retrieval_msg.payload.get('similarities', [])
         
-        # Search for similar chunks
-        results = vector_db.search(query, top_k=top_k)
-        
-        # Format results
-        contexts = []
-        for result in results:
-            contexts.append({
-                'content': result['content'],
-                'filename': result['metadata']['filename'],
-                'similarity': result['similarity']
+        # Format for app
+        formatted = []
+        for i, ctx in enumerate(contexts):
+            formatted.append({
+                'content': ctx,
+                'filename': 'document',
+                'similarity': similarities[i] if i < len(similarities) else 0.5
             })
         
-        logger.info(f"Retrieved {len(contexts)} relevant contexts for query")
-        return contexts
-        
+        logger.info(f"✅ RetrievalAgent retrieved {len(formatted)} contexts")
+        return formatted
     except Exception as e:
-        logger.error(f"Failed to retrieve context: {str(e)}")
+        logger.error(f"Retrieval failed: {str(e)}")
         return []
 
 @app.route('/')
@@ -406,8 +189,12 @@ def upload_files():
                 
                 file.save(filepath)
                 
-                # Extract text content
-                text_content = extract_text_from_file(filepath, filename)
+                # Use agents to parse document
+                if parse_document:
+                    chunks = parse_document(filepath)
+                    text_content = ' '.join(chunks) if chunks else ''
+                else:
+                    text_content = ''
                 
                 # Store in vector database for professional RAG
                 vector_stored = store_document_in_vector_db(filename, text_content)
@@ -417,7 +204,7 @@ def upload_files():
                     'filepath': filepath,
                     'content': text_content[:2000],  # Store first 2000 chars for session
                     'vector_stored': vector_stored,
-                    'chunks_count': len(chunk_text(text_content))
+                    'chunks_count': len(chunks) if chunks else 0
                 })
         
         if not uploaded_files:
@@ -495,14 +282,13 @@ def chat():
             logger.info(f"Using vector search with {len(relevant_contexts)} chunks, avg similarity: {avg_similarity:.3f}")
             
         else:
-            # Fallback to simple text search if vector DB fails
+            # Fallback to stored content if vector DB fails
             context_text = ""
             for file_info in uploaded_files:
-                filepath = file_info.get('filepath')
+                content = file_info.get('content', '')
                 filename = file_info.get('filename')
-                if filepath and os.path.exists(filepath):
-                    full_content = extract_text_from_file(filepath, filename)
-                    context_text += f"\n\n=== Content from {filename} ===\n{full_content[:3000]}\n"
+                if content:
+                    context_text += f"\n\n=== Content from {filename} ===\n{content[:3000]}\n"
             
             avg_similarity = 0.5  # Default similarity for fallback
             logger.info("Using fallback text search (vector DB unavailable)")
@@ -615,25 +401,26 @@ def clear_conversation():
 def health():
     try:
         has_files = 'uploaded_files' in session and len(session['uploaded_files']) > 0
+        embedding_mode = 'tfidf' if embedding_store and embedding_store.use_tfidf else 'sentence_transformers'
         
         return jsonify({
             'status': 'healthy',
-            'service': 'Agentic RAG System with TF-IDF',
+            'service': 'Agentic RAG with ChromaDB',
             'has_files': has_files,
             'ai_enabled': bool(model),
-            'vector_db_enabled': bool(vector_db),
-            'vector_db_fitted': vector_db.fitted if vector_db else False,
+            'vector_db_enabled': bool(embedding_store),
+            'embedding_mode': embedding_mode,
             'multi_agent_enabled': AGENTS_AVAILABLE,
-            'rag_mode': 'tfidf_production',
             'features': [
-                'tfidf_search', 
+                'chromadb',
                 'multi_agent_coordination',
-                'advanced_chunking',
+                'mcp_protocol',
                 'voice_input',
-                '6_file_formats'
+                '6_file_formats',
+                embedding_mode + '_embeddings'
             ],
             'timestamp': datetime.now().isoformat(),
-            'version': '3.0.0'
+            'version': '4.0.0'
         })
     except Exception as e:
         logger.error(f"Health check error: {str(e)}")
