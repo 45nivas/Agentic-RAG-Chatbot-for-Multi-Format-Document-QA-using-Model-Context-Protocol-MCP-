@@ -334,7 +334,14 @@ def store_document_in_vector_db(filename, text_content):
         return False
     
     try:
-        return vector_db.add_document(filename, text_content)
+        success = vector_db.add_document(filename, text_content)
+        
+        # Save to session for persistence
+        if success:
+            session['vector_chunks'] = vector_db.chunks
+            session.modified = True
+        
+        return success
         
     except Exception as e:
         logger.error(f"Failed to store document in vector DB: {str(e)}")
@@ -346,6 +353,12 @@ def retrieve_relevant_context(query, top_k=5):
         return []
     
     try:
+        # Restore chunks from session
+        if 'vector_chunks' in session and session['vector_chunks']:
+            vector_db.chunks = session['vector_chunks']
+            if vector_db.chunks and not vector_db.fitted:
+                vector_db._build_vector_index()
+        
         # Search for similar chunks
         results = vector_db.search(query, top_k=top_k)
         
