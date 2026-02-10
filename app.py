@@ -237,22 +237,9 @@ except Exception as e:
     logger.error(f"Failed to initialize Modern Vector DB: {str(e)}")
     vector_db = None
 
-# Initialize Multi-Agent System
-if AGENTS_AVAILABLE:
-    try:
-        coordinator = CoordinatorAgent()
-        ingestion_agent = IngestionAgent()
-        retrieval_agent = RetrievalAgent()
-        llm_agent = LLMResponseAgent()
-        logger.info("Multi-agent system initialized successfully")
-    except Exception as e:
-        logger.error(f"Failed to initialize agents: {str(e)}")
-        AGENTS_AVAILABLE = False
-else:
-    coordinator = None
-    ingestion_agent = None
-    retrieval_agent = None
-    llm_agent = None
+# Multi-Agent System disabled in production (uses TF-IDF pipeline instead)
+# Full multi-agent system available via flask_app/app.py
+coordinator = None
 
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'pptx', 'csv', 'txt', 'md'}
