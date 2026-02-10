@@ -59,7 +59,7 @@ if GEMINI_API_KEY and GEMINI_API_KEY != 'your-gemini-api-key':
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         # Try multiple models in case quota varies
-        models_to_try = ['models/gemini-2.0-flash-exp', 'models/gemini-2.0-flash', 'models/gemini-2.5-flash']
+        models_to_try = ['models/gemini-1.5-flash']
         
         for model_name in models_to_try:
             try:
@@ -223,6 +223,7 @@ def upload_files():
                 file.save(filepath)
                 
                 # Use agents to parse document
+                chunks = None  # Initialize chunks
                 if parse_document:
                     chunks = parse_document(filepath)
                     text_content = ' '.join(chunks) if chunks else ''

@@ -49,7 +49,7 @@ GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 model = None
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('models/gemini-2.5-flash')
+    model = genai.GenerativeModel('models/gemini-1.5-flash')
     logger.info("✅ Gemini AI configured")
 else:
     logger.warning("⚠️ No GEMINI_API_KEY found - responses will be limited")

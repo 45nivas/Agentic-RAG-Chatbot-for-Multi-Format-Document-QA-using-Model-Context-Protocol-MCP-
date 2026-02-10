@@ -13,7 +13,7 @@ if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY not found in environment variables. Please check your .env file.")
 
 class LLMClient:
-    def __init__(self, model: str = "gemini-2.5-flash"):
+    def __init__(self, model: str = "gemini-1.5-flash"):
         genai.configure(api_key=GEMINI_API_KEY)
         self.model = model
         self.gemini = genai.GenerativeModel(model)
