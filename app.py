@@ -81,21 +81,54 @@ if GEMINI_API_KEY and GEMINI_API_KEY != 'your-gemini-api-key':
 else:
     logger.warning("⚠️ No valid Gemini API key found in environment variables")
 
-# Initialize Multi-Agent System with ChromaDB
+# Simple in-memory storage for Render (lightweight)
+class SimpleVectorStore:
+    def __init__(self):
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        self.vectorizer = TfidfVectorizer(max_features=200, stop_words='english')
+        self.chunks = []
+        self.fitted = False
+        logger.info("✅ Simple in-memory vector store initialized")
+    
+    def add_chunks(self, chunks):
+        if chunks:
+            self.chunks.extend(chunks)
+            self.fitted = False
+    
+    def query(self, query_text, top_k=3):
+        if not self.chunks:
+            return {'documents': [], 'similarities': []}
+        
+        try:
+            if not self.fitted:
+                self.vectorizer.fit(self.chunks)
+                self.fitted = True
+            
+            vectors = self.vectorizer.transform(self.chunks)
+            query_vec = self.vectorizer.transform([query_text])
+            from sklearn.metrics.pairwise import cosine_similarity
+            sims = cosine_similarity(query_vec, vectors)[0]
+            top_indices = sims.argsort()[-top_k:][::-1]
+            
+            docs = [self.chunks[i] for i in top_indices]
+            scores = [float(sims[i]) for i in top_indices]
+            return {'documents': docs, 'similarities': scores}
+        except:
+            return {'documents': self.chunks[:top_k], 'similarities': [0.5] * min(top_k, len(self.chunks))}
+
+# Initialize Multi-Agent System with lightweight storage
 if AGENTS_AVAILABLE:
     try:
-        from agents.embedding_utils import EmbeddingStore
-        
         coordinator = CoordinatorAgent()
         ingestion_agent = IngestionAgent()
         retrieval_agent = RetrievalAgent()
         llm_agent = LLMResponseAgent()
         
-        # Initialize shared vector store with ChromaDB
-        embedding_store = EmbeddingStore(persist_path="./chroma_render")
+        # Use simple in-memory store for Render (no ChromaDB memory overhead)
+        embedding_store = SimpleVectorStore()
         retrieval_agent.vector_store = embedding_store
         
-        logger.info("✅ Multi-agent system with ChromaDB initialized")
+        logger.info("✅ Multi-agent system initialized (lightweight mode)")
     except Exception as e:
         logger.error(f"❌ Failed to initialize agents: {str(e)}")
         AGENTS_AVAILABLE = False
@@ -401,26 +434,22 @@ def clear_conversation():
 def health():
     try:
         has_files = 'uploaded_files' in session and len(session['uploaded_files']) > 0
-        embedding_mode = 'tfidf' if embedding_store and embedding_store.use_tfidf else 'sentence_transformers'
         
         return jsonify({
             'status': 'healthy',
-            'service': 'Agentic RAG with ChromaDB',
+            'service': 'Agentic RAG (Lightweight)',
             'has_files': has_files,
             'ai_enabled': bool(model),
             'vector_db_enabled': bool(embedding_store),
-            'embedding_mode': embedding_mode,
             'multi_agent_enabled': AGENTS_AVAILABLE,
+            'embedding_mode': 'tfidf_inmemory',
             'features': [
-                'chromadb',
-                'multi_agent_coordination',
-                'mcp_protocol',
+                'multi_agent_mcp',
+                'tfidf_search',
                 'voice_input',
-                '6_file_formats',
-                embedding_mode + '_embeddings'
+                '6_file_formats'
             ],
-            'timestamp': datetime.now().isoformat(),
-            'version': '4.0.0'
+            'timestamp': datetime.now().isoformat()
         })
     except Exception as e:
         logger.error(f"Health check error: {str(e)}")
