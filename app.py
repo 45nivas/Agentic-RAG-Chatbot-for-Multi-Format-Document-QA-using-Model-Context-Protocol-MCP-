@@ -22,14 +22,10 @@ import pickle
 import json
 
 # Multi-Agent Architecture
-try:
-    from agents.coordinator_agent import CoordinatorAgent
-    from agents.ingestion_agent import IngestionAgent
-    from agents.retrieval_agent import RetrievalAgent
-    from agents.llm_response_agent import LLMResponseAgent
-    AGENTS_AVAILABLE = True
-except ImportError as e:
-    AGENTS_AVAILABLE = False
+# NOTE: In production (Render), agents use Sentence Transformers + ChromaDB which
+# exceed the 512MB memory limit. The production app.py uses its own lightweight
+# TF-IDF pipeline instead. Full multi-agent system runs via flask_app/app.py.
+AGENTS_AVAILABLE = False
 
 load_dotenv()
 
