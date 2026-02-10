@@ -9,6 +9,7 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
+tmpclaude-*/
 
 # ChromaDB database files (vector storage)
 chroma_db/
