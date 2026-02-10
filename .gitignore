@@ -13,6 +13,8 @@ tmpclaude-*/
 
 # ChromaDB database files (vector storage)
 chroma_db/
+chroma_advanced/
+chroma_efficient/
 *.sqlite3
 *.db
 

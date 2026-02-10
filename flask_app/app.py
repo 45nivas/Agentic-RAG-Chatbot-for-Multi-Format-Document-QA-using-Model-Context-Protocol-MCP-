@@ -25,14 +25,11 @@ from agents.mcp import MCPMessage
 from agents.embedding_utils import EmbeddingStore
 
 # Advanced AI Stack
-from sentence_transformers import SentenceTransformer
-import chromadb
-from chromadb.config import Settings
+
 import numpy as np
 print("✅ Sentence Transformers + ChromaDB - Advanced AI Stack!")
 
 import google.generativeai as genai
-import json
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
@@ -49,7 +46,7 @@ GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 model = None
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('models/gemini-1.5-flash')
+    model = genai.GenerativeModel('models/gemini-2.5-flash')
     logger.info("✅ Gemini AI configured")
 else:
     logger.warning("⚠️ No GEMINI_API_KEY found - responses will be limited")
@@ -167,47 +164,6 @@ class AgenticRAG:
 
 # Initialize the Multi-Agent RAG system
 rag = AgenticRAG()
-
-
-# File processing helpers
-def process_file(file_path, filename):
-    """Extract text from uploaded file"""
-    try:
-        ext = filename.rsplit('.', 1)[-1].lower()
-
-        if ext == 'pdf':
-            import PyPDF2
-            with open(file_path, 'rb') as f:
-                reader = PyPDF2.PdfReader(f)
-                return " ".join([page.extract_text() for page in reader.pages])
-
-        elif ext == 'docx':
-            import docx
-            doc = docx.Document(file_path)
-            return " ".join([para.text for para in doc.paragraphs])
-
-        elif ext == 'pptx':
-            from pptx import Presentation
-            prs = Presentation(file_path)
-            slides_text = []
-            for i, slide in enumerate(prs.slides):
-                slide_text = " ".join([shape.text for shape in slide.shapes if hasattr(shape, "text")])
-                slides_text.append(f"Slide {i+1}: {slide_text}")
-            return "\n".join(slides_text)
-
-        elif ext == 'csv':
-            import pandas as pd
-            df = pd.read_csv(file_path)
-            return df.to_string()
-
-        elif ext in ['txt', 'md']:
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                return f.read()
-
-        return ""
-    except Exception as e:
-        logger.error(f"Processing error: {e}")
-        return ""
 
 
 # Flask routes

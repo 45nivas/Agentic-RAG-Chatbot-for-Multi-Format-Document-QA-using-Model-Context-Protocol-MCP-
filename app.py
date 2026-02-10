@@ -10,7 +10,6 @@ import PyPDF2
 import docx
 from pptx import Presentation
 import csv
-import io
 import numpy as np
 
 # Production-Ready Components - Lightweight for Render Deployment
@@ -18,7 +17,6 @@ import numpy as np
 
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
-import pickle
 import json
 
 # Multi-Agent Architecture
@@ -40,11 +38,7 @@ app.config['DEBUG'] = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Log agent availability
-if AGENTS_AVAILABLE:
-    logger.info("Multi-agent architecture loaded successfully")
-else:
-    logger.warning("Agents not available, using direct implementation")
+logger.info("Production mode: lightweight TF-IDF pipeline active")
 
 # Professional RAG System - Lightweight Implementation
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
@@ -232,7 +226,7 @@ class ModernVectorDB:
 # Initialize Modern Professional Components
 try:
     vector_db = ModernVectorDB()
-    logger.info("Modern Vector Database with SentenceTransformers initialized successfully")
+    logger.info("Production Vector Database initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize Modern Vector DB: {str(e)}")
     vector_db = None
@@ -431,40 +425,7 @@ def chat():
         if not uploaded_files:
             return jsonify({'error': 'Please upload documents first'}), 400
         
-        # Modern Multi-Agent RAG Processing
-        if AGENTS_AVAILABLE and coordinator:
-            try:
-                # Use coordinated multi-agent approach
-                response = coordinator.process_query(
-                    query=user_message,
-                    documents=uploaded_files,
-                    session_id=session.get('session_id', str(uuid.uuid4()))
-                )
-                
-                conversation = session.get('conversation', [])
-                conversation.append({
-                    'user': user_message,
-                    'assistant': response.content,
-                    'metadata': {
-                        'agent_type': 'multi_agent',
-                        'similarity_scores': response.metadata.get('similarities', []),
-                        'sources': response.metadata.get('sources', []),
-                        'processing_time': response.metadata.get('time', 0),
-                        'timestamp': datetime.now().isoformat()
-                    }
-                })
-                session['conversation'] = conversation
-                
-                return jsonify({
-                    'response': response.content,
-                    'metadata': response.metadata,
-                    'agent_type': 'multi_agent_coordinator'
-                })
-                
-            except Exception as e:
-                logger.warning(f"Multi-agent processing failed, falling back: {e}")
-        
-        # Fallback: Modern Vector Search with Sentence Transformers
+        # TF-IDF Vector Search (Production Pipeline)
         relevant_contexts = retrieve_relevant_context(user_message, top_k=5)
         
         if relevant_contexts:

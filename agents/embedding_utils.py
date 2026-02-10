@@ -1,7 +1,6 @@
 from typing import List
 import numpy as np
 import chromadb
-import time
 
 # Lazy import to avoid circular dependency issues
 def get_sentence_transformer():
