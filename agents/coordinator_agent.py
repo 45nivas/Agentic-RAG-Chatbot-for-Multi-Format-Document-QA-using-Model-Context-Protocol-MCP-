@@ -30,6 +30,7 @@ class CoordinatorAgent:
             ingest_msg = self.ingestion_agent.parse_documents(file_paths)
             self.mcp_trace.append(ingest_msg.to_dict())
             chunks = ingest_msg.payload.get("chunks", [])
+            failed_files = ingest_msg.payload.get("failed_files", [])
             
             if not chunks:
                 return {"error": "No text extracted from document"}
@@ -43,6 +44,7 @@ class CoordinatorAgent:
                 "success": True,
                 "profile": profile,
                 "chunks": chunks,
+                "failed_files": failed_files,
                 "mcp_trace": self.mcp_trace
             }
         except Exception as e:

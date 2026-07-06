@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { MealPlan, Meal } from '../types';
-import { CheckSquare, Square, ChevronDown, ChevronUp, Calendar, Compass } from 'lucide-react';
+import { CheckSquare, Square, ChevronDown, ChevronUp, Calendar, Compass, Upload } from 'lucide-react';
 
 interface MealProgramProps {
   mealPlan: MealPlan | null;
@@ -13,6 +13,8 @@ export const MealProgram: React.FC<MealProgramProps> = ({
   checkedMeals,
   toggleMealChecked,
 }) => {
+  const isRealData = mealPlan !== null;
+
   // Accordion open states
   const [openMeal, setOpenMeal] = useState<string | null>('breakfast');
 
@@ -56,7 +58,7 @@ export const MealProgram: React.FC<MealProgramProps> = ({
     }
   };
 
-  const activePlan = mealPlan || defaultMeals;
+  const activePlan = isRealData ? mealPlan : defaultMeals;
   const mealKeys: (keyof MealPlan)[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
   const toggleAccordion = (key: string) => {
@@ -64,7 +66,20 @@ export const MealProgram: React.FC<MealProgramProps> = ({
   };
 
   return (
-    <div className="clinical-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className="clinical-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', position: 'relative', overflow: 'hidden' }}>
+      {!isRealData && (
+        <div style={{
+          position: 'absolute',
+          top: '12px',
+          right: '12px',
+          zIndex: 10,
+        }}>
+          <span className="stat-pill accent-gold" style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            Sample Preview
+          </span>
+        </div>
+      )}
+
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid #dedad4', paddingBottom: '10px' }}>
         <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#1A1A18', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Calendar size={18} style={{ color: '#C8A97A' }} />
@@ -73,7 +88,15 @@ export const MealProgram: React.FC<MealProgramProps> = ({
         <span style={{ fontSize: '0.75rem', color: '#9E9990', fontWeight: 500 }}>Select meals consumed to update Macro Rings</span>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+        opacity: isRealData ? 1 : 0.4,
+        pointerEvents: isRealData ? 'auto' : 'none',
+        filter: isRealData ? 'none' : 'blur(0.5px)',
+        transition: 'all 0.3s ease'
+      }}>
         {mealKeys.map((key) => {
           const meal = activePlan[key] as Meal;
           if (!meal) return null;
@@ -212,6 +235,40 @@ export const MealProgram: React.FC<MealProgramProps> = ({
           );
         })}
       </div>
+
+      {!isRealData && (
+        <div style={{
+          position: 'absolute',
+          top: '60px',
+          left: '0',
+          right: '0',
+          bottom: '0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          zIndex: 5,
+        }}>
+          <div style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            border: '1px solid var(--brand-gold)',
+            borderRadius: 'var(--radius-md)',
+            padding: '16px 24px',
+            textAlign: 'center',
+            boxShadow: '0 4px 12px rgba(26, 26, 24, 0.08)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '8px',
+            maxWidth: '280px',
+          }}>
+            <Upload size={20} style={{ color: 'var(--brand-gold-dark)' }} />
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Upload a health report to get your personalized meal plan
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

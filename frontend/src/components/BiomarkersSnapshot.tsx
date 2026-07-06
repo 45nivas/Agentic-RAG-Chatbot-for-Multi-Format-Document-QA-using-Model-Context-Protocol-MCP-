@@ -1,12 +1,14 @@
 import React from 'react';
 import type { Biomarker } from '../types';
-import { Heart } from 'lucide-react';
+import { Heart, Upload } from 'lucide-react';
 
 interface BiomarkersSnapshotProps {
   biomarkers: Biomarker[];
 }
 
 export const BiomarkersSnapshot: React.FC<BiomarkersSnapshotProps> = ({ biomarkers }) => {
+  const isRealData = biomarkers.length > 0;
+
   // Safe baseline if no biomarkers uploaded yet
   const defaultBiomarkers: Biomarker[] = [
     { name: 'Fast Glucose', value: 92, unit: 'mg/dL', status: 'Normal', normal_range: '70 - 99 mg/dL', clinical_significance: 'Optimal fasting blood glucose indicates efficient insulin action and carbohydrate metabolism.' },
@@ -14,7 +16,7 @@ export const BiomarkersSnapshot: React.FC<BiomarkersSnapshotProps> = ({ biomarke
     { name: 'Vitamin D', value: 24, unit: 'ng/mL', status: 'Low', normal_range: '30 - 100 ng/mL', clinical_significance: 'Vitamin D is deficient, which can impair bone health and immunity. Exposure to sunlight is recommended.' },
   ];
 
-  const activeBiomarkers = biomarkers.length > 0 ? biomarkers : defaultBiomarkers;
+  const activeBiomarkers = isRealData ? biomarkers : defaultBiomarkers;
 
   // Helper to determine indicator position (percentage 0 to 100) on the horizontal bar
   const getPositionPercent = (biomarker: Biomarker): number => {
@@ -66,7 +68,20 @@ export const BiomarkersSnapshot: React.FC<BiomarkersSnapshotProps> = ({ biomarke
   };
 
   return (
-    <div className="clinical-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className="clinical-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', position: 'relative', overflow: 'hidden' }}>
+      {!isRealData && (
+        <div style={{
+          position: 'absolute',
+          top: '12px',
+          right: '12px',
+          zIndex: 10,
+        }}>
+          <span className="stat-pill accent-gold" style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            Sample Preview
+          </span>
+        </div>
+      )}
+
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid #dedad4', paddingBottom: '10px' }}>
         <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#1A1A18', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Heart size={18} style={{ color: '#C8A97A' }} />
@@ -75,7 +90,15 @@ export const BiomarkersSnapshot: React.FC<BiomarkersSnapshotProps> = ({ biomarke
         <span style={{ fontSize: '0.75rem', color: '#9E9990', fontWeight: 500 }}>InsideTracker Reference Standard</span>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '20px',
+        opacity: isRealData ? 1 : 0.4,
+        pointerEvents: isRealData ? 'auto' : 'none',
+        filter: isRealData ? 'none' : 'blur(0.5px)',
+        transition: 'all 0.3s ease'
+      }}>
         {activeBiomarkers.map((bio) => {
           const needlePos = getPositionPercent(bio);
           const statusColor = getStatusColor(bio.status);
@@ -170,6 +193,40 @@ export const BiomarkersSnapshot: React.FC<BiomarkersSnapshotProps> = ({ biomarke
           );
         })}
       </div>
+
+      {!isRealData && (
+        <div style={{
+          position: 'absolute',
+          top: '60px',
+          left: '0',
+          right: '0',
+          bottom: '0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          zIndex: 5,
+        }}>
+          <div style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            border: '1px solid var(--brand-gold)',
+            borderRadius: 'var(--radius-md)',
+            padding: '16px 24px',
+            textAlign: 'center',
+            boxShadow: '0 4px 12px rgba(26, 26, 24, 0.08)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '8px',
+            maxWidth: '280px',
+          }}>
+            <Upload size={20} style={{ color: 'var(--brand-gold-dark)' }} />
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Upload a health report to see your real biomarker analysis
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

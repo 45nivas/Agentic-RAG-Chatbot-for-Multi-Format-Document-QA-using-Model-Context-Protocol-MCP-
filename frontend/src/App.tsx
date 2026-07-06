@@ -441,6 +441,7 @@ function App() {
                   <FuelingRings
                     targets={activeTargets}
                     consumed={consumedMacros}
+                    isRealTargets={isRealTargets}
                   />
                   <BiomarkersSnapshot
                     biomarkers={profile.biomarkers}

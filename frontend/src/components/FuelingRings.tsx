@@ -1,4 +1,5 @@
 import React from 'react';
+import { Upload } from 'lucide-react';
 
 interface MacroStats {
   calories: number;
@@ -10,9 +11,10 @@ interface MacroStats {
 interface FuelingRingsProps {
   targets: MacroStats;
   consumed: MacroStats;
+  isRealTargets: boolean;
 }
 
-export const FuelingRings: React.FC<FuelingRingsProps> = ({ targets, consumed }) => {
+export const FuelingRings: React.FC<FuelingRingsProps> = ({ targets, consumed, isRealTargets }) => {
   // Ensure targets are never zero to avoid division by zero
   const tgtCalories = targets.calories || 2000;
   const tgtProtein = targets.protein || 130;
@@ -34,12 +36,35 @@ export const FuelingRings: React.FC<FuelingRingsProps> = ({ targets, consumed })
   ];
 
   return (
-    <div className="clinical-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className="clinical-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', position: 'relative', overflow: 'hidden' }}>
+      {!isRealTargets && (
+        <div style={{
+          position: 'absolute',
+          top: '12px',
+          right: '12px',
+          zIndex: 10,
+        }}>
+          <span className="stat-pill accent-gold" style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            Sample Preview
+          </span>
+        </div>
+      )}
+
       <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#1A1A18', borderBottom: '0.5px solid #dedad4', paddingBottom: '10px' }}>
         Fueling Rings & Macro Progress
       </h3>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', gap: '24px', flexWrap: 'wrap' }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+        gap: '24px',
+        flexWrap: 'wrap',
+        opacity: isRealTargets ? 1 : 0.4,
+        pointerEvents: isRealTargets ? 'auto' : 'none',
+        filter: isRealTargets ? 'none' : 'blur(0.5px)',
+        transition: 'all 0.3s ease'
+      }}>
         {/* SVG Concentric Rings Container */}
         <div style={{ position: 'relative', width: '180px', height: '180px' }}>
           <svg width="180" height="180" viewBox="0 0 180 180" style={{ transform: 'rotate(-90deg)' }}>
@@ -126,6 +151,40 @@ export const FuelingRings: React.FC<FuelingRingsProps> = ({ targets, consumed })
           ))}
         </div>
       </div>
+
+      {!isRealTargets && (
+        <div style={{
+          position: 'absolute',
+          top: '60px',
+          left: '0',
+          right: '0',
+          bottom: '0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          zIndex: 5,
+        }}>
+          <div style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            border: '1px solid var(--brand-gold)',
+            borderRadius: 'var(--radius-md)',
+            padding: '16px 24px',
+            textAlign: 'center',
+            boxShadow: '0 4px 12px rgba(26, 26, 24, 0.08)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '8px',
+            maxWidth: '280px',
+          }}>
+            <Upload size={20} style={{ color: 'var(--brand-gold-dark)' }} />
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Upload a health report to see your real calorie & macro targets
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

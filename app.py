@@ -253,6 +253,14 @@ def upload():
                 if ext not in ALLOWED_EXTENSIONS:
                     return jsonify({'error': f'File type not allowed: {ext}'}), 400
                     
+                file.seek(0, os.SEEK_END)
+                size = file.tell()
+                file.seek(0)
+                if size == 0:
+                    return jsonify({'error': f'File is empty: {file.filename}'}), 400
+                if size > 20 * 1024 * 1024:
+                    return jsonify({'error': f'File too large: {file.filename} (max 20MB per file)'}), 400
+
         logger.info("🗑️ Clearing previous data before new upload...")
         session_id = get_or_create_session_id()
         # Delete existing session and messages in DB for this UUID
@@ -261,6 +269,7 @@ def upload():
         db.session.commit()
         rag.clear()
         processed = []
+        failed = []
         extracted_profile = None
         mcp_trace = []
 
@@ -276,6 +285,8 @@ def upload():
                     
                     if ingest_result.get("success"):
                         processed.append(filename)
+                        if "failed_files" in ingest_result:
+                            failed.extend(ingest_result["failed_files"])
                         extracted_profile = ingest_result.get("profile")
                         mcp_trace.extend(ingest_result.get("mcp_trace", []))
                         
