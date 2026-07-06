@@ -28,20 +28,34 @@ load_dotenv()
 from flask_sqlalchemy import SQLAlchemy
 import uuid
 import json
+import secrets
 
-app = Flask(__name__, static_folder=None)
-# Enable CORS for local development with React frontend on Port 5173
-CORS(app, supports_credentials=True, origins=["http://localhost:5173", "http://127.0.0.1:5173"])
-
-app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-advanced-nutrimind')
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB for medical reports
-app.config['ENV'] = os.environ.get('FLASK_ENV', 'development')
-app.config['DEBUG'] = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
-
-# Database Configuration
-# Database Configuration
+# Configure logging first to enable warning logs during initialization
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Resolve allowed CORS origins from environment variable (comma-separated string)
+allowed_origins_env = os.environ.get('ALLOWED_ORIGINS')
+if allowed_origins_env:
+    allowed_origins = [origin.strip() for origin in allowed_origins_env.split(',') if origin.strip()]
+else:
+    allowed_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+logger.info(f"🔒 Configured Allowed CORS Origins: {allowed_origins}")
+
+app = Flask(__name__, static_folder=None)
+CORS(app, supports_credentials=True, origins=allowed_origins)
+
+env_secret = os.environ.get('SECRET_KEY')
+if env_secret:
+    app.secret_key = env_secret
+else:
+    app.secret_key = secrets.token_hex(32)
+    logger.warning("⚠️ WARNING: SECRET_KEY environment variable is not set. Generated a random secret key. User sessions will not persist across server restarts!")
+
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB for medical reports
+app.config['ENV'] = os.environ.get('FLASK_ENV', 'development')
+app.config['DEBUG'] = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///nutrimind.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -432,4 +446,5 @@ if __name__ == '__main__':
     host = os.environ.get('HOST', '0.0.0.0')
     port = int(os.environ.get('PORT', 5000))
     logger.info(f"🚀 Starting NutriMind Agentic Health Coach on {host}:{port}!")
+    logger.info(f"⚙️ FLASK DEBUG MODE: {app.config['DEBUG']}")
     app.run(debug=app.config['DEBUG'], host=host, port=port)
