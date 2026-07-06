@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { AgentTrace } from '../types';
-import { BookOpen, ShieldAlert, Award, Dumbbell, Apple, Heart, User, CheckCircle, AlertTriangle, Play, HelpCircle } from 'lucide-react';
+import { BookOpen, ShieldAlert, Award, Dumbbell, Apple, Heart, User, CheckCircle, AlertTriangle, Play, HelpCircle, Users } from 'lucide-react';
 
 interface BoardDebateProps {
   mcpTraces: AgentTrace[];
