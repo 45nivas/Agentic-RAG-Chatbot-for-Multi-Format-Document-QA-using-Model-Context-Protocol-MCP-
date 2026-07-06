@@ -35,6 +35,7 @@ Flask-Limiter>=3.5.0
 
 # Persistent Storage Layer
 Flask-SQLAlchemy>=3.0.0
+psycopg2-binary>=2.9.0
 
 # Document Generation (10/10 Wow Feature)
 reportlab>=4.0.0

@@ -80,7 +80,18 @@ app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB for medical report
 app.config['ENV'] = os.environ.get('FLASK_ENV', 'development')
 app.config['DEBUG'] = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///nutrimind.db'
+# Database Configuration: Use DATABASE_URL if provided, else fall back to local SQLite
+db_url = os.environ.get('DATABASE_URL')
+if db_url:
+    # Handle Render/Heroku legacy postgres:// schema mapping to postgresql://
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+    logger.info("🗄️ Database: Configured to use external SQL Database from environment.")
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///nutrimind.db'
+    logger.info("🗄️ Database: Configured to use local SQLite database (nutrimind.db).")
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
