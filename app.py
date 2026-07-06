@@ -44,7 +44,30 @@ else:
 logger.info(f"🔒 Configured Allowed CORS Origins: {allowed_origins}")
 
 app = Flask(__name__, static_folder=None)
+
+# Apply ProxyFix middleware to trust Render's reverse proxy headers (1 hop)
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
 CORS(app, supports_credentials=True, origins=allowed_origins)
+
+# Initialize Flask-Limiter for rate limiting
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_limiter.errors import RateLimitExceeded
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=[],
+    # Note: memory:// store is intentional given the current single-worker deployment.
+    # If scaled to multiple Gunicorn workers or instances, this must be switched to redis://.
+    storage_uri="memory://"
+)
+
+@app.errorhandler(RateLimitExceeded)
+def ratelimit_handler(e):
+    return jsonify({"error": "Rate limit exceeded, please slow down"}), 429
 
 env_secret = os.environ.get('SECRET_KEY')
 if env_secret:
@@ -159,6 +182,7 @@ def async_background_embedding(chunks, filename):
         logger.error(f"❌ Error in async embedding for {filename}: {e}")
 
 @app.route('/api/upload', methods=['POST'])
+@limiter.limit("10 per minute")
 def upload():
     """Upload health reports → extract biomarkers in the foreground (fast) and index chunks in background"""
     try:
@@ -256,6 +280,7 @@ def upload():
         }), 500
 
 @app.route('/api/chat', methods=['POST'])
+@limiter.limit("20 per minute")
 def chat():
     """Chat → Run Plan-Reason-Audit multi-agent loop with native concurrency optimizations"""
     try:
