@@ -38,9 +38,11 @@ def parse_pptx(path: str) -> List[str]:
 
 def parse_csv(path: str) -> List[str]:
     try:
-        import pandas as pd
-        df = pd.read_csv(path)
-        return chunk_text(df.to_csv(index=False))
+        import csv
+        with open(path, encoding="utf-8", errors="replace") as f:
+            reader = csv.reader(f)
+            rows = [", ".join(row) for row in reader]
+        return chunk_text("\n".join(rows))
     except Exception as e:
         return [f"Error parsing CSV: {str(e)}"]
 

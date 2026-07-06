@@ -1,600 +1,435 @@
-from flask import Flask, render_template, request, jsonify, session
+# -*- coding: utf-8 -*-
+import sys
+import io
 import os
-import uuid
 import logging
 from datetime import datetime
+from flask import Flask, request, jsonify, session, send_from_directory
+from flask_cors import CORS
 from werkzeug.utils import secure_filename
-import google.generativeai as genai
 from dotenv import load_dotenv
-import PyPDF2
-import docx
-from pptx import Presentation
-import csv
-import numpy as np
+from concurrent.futures import ThreadPoolExecutor
 
-# Production-Ready Components - Lightweight for Render Deployment
-# Using optimized TF-IDF for reliable cloud deployment within memory limits 
+# Set UTF-8 encoding for Windows console
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.feature_extraction.text import TfidfVectorizer
-import json
+# Ensure agents can be imported correctly
+sys.path.insert(0, os.path.dirname(__file__))
 
-# Multi-Agent Architecture
-# NOTE: In production (Render), agents use Sentence Transformers + ChromaDB which
-# exceed the 512MB memory limit. The production app.py uses its own lightweight
-# TF-IDF pipeline instead. Full multi-agent system runs via flask_app/app.py.
-AGENTS_AVAILABLE = False
+# Multi-Agent Architecture with MCP Protocol
+from agents.coordinator_agent import CoordinatorAgent
+from agents.embedding_utils import EmbeddingStore
+from agents.report_generator import ClinicalReportGenerator
 
 load_dotenv()
 
-app = Flask(__name__)
+from flask_sqlalchemy import SQLAlchemy
+import uuid
+import json
 
-# Production-ready configuration - Updated for deployment
-app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB for production
-app.config['ENV'] = os.environ.get('FLASK_ENV', 'production')
-app.config['DEBUG'] = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+app = Flask(__name__, static_folder=None)
+# Enable CORS for local development with React frontend on Port 5173
+CORS(app, supports_credentials=True, origins=["http://localhost:5173", "http://127.0.0.1:5173"])
 
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-advanced-nutrimind')
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB for medical reports
+app.config['ENV'] = os.environ.get('FLASK_ENV', 'development')
+app.config['DEBUG'] = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
+
+# Database Configuration
+# Database Configuration
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-logger.info("Production mode: lightweight TF-IDF pipeline active")
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///nutrimind.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
-# Professional RAG System - Lightweight Implementation
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
-model = None
-if GEMINI_API_KEY and GEMINI_API_KEY != 'your-gemini-api-key':
+class UserSession(db.Model):
+    id = db.Column(db.String, primary_key=True)  # UUID
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    profile_json = db.Column(db.Text)  # serialized Profile
+    uploaded_files_json = db.Column(db.Text)  # serialized list of uploaded file names
+    meal_plan_json = db.Column(db.Text)      # serialized meal plan
+    training_plan_json = db.Column(db.Text)  # serialized training split
+    bio_age_json = db.Column(db.Text)        # serialized biological age metrics
+    critique_json = db.Column(db.Text)       # serialized board review critique
+    audit_report = db.Column(db.Text)        # raw safety audit report text
+    corrections_json = db.Column(db.Text)    # serialized list of safety corrections
+
+class ChatMessage(db.Model):
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    session_id = db.Column(db.String, db.ForeignKey('user_session.id'), nullable=False)
+    role = db.Column(db.String, nullable=False)  # 'user' | 'assistant'
+    content = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+with app.app_context():
     try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        # Try multiple models in case quota varies
-        models_to_try = ['models/gemini-2.0-flash-exp', 'models/gemini-2.0-flash', 'models/gemini-2.5-flash']
-        
-        for model_name in models_to_try:
-            try:
-                model = genai.GenerativeModel(model_name)
-                # Quick test
-                test_response = model.generate_content("Hi")
-                logger.info(f"✅ Gemini AI configured successfully with {model_name}")
-                break
-            except Exception as model_error:
-                logger.warning(f"⚠️ Failed with {model_name}: {str(model_error)[:100]}")
-                continue
-        
-        if model is None:
-            logger.error("❌ All Gemini models failed - likely quota exceeded")
-            
-    except Exception as e:
-        logger.error(f"❌ Failed to configure Gemini AI: {str(e)}")
-        model = None
-else:
-    logger.warning("⚠️ No valid Gemini API key found in environment variables")
+        # Detect if database has new schema columns
+        db.session.execute(db.text("SELECT meal_plan_json FROM user_session LIMIT 1"))
+    except Exception:
+        # Drop and recreate if older schema version is loaded
+        logger.info("Schema mismatch detected in SQLite. Dropping and re-initializing database tables...")
+        db.drop_all()
+    db.create_all()
 
-# Production-Optimized Vector Database - Lightweight for Cloud Deployment
-class ModernVectorDB:
-    """Professional TF-IDF implementation optimized for production deployment"""
-    
+def get_or_create_session_id():
+    if 'session_id' not in session:
+        session['session_id'] = str(uuid.uuid4())
+        session.modified = True
+    return session['session_id']
+
+# Native Thread Pool for Asynchronous Background Ingestion and Parallel Executions
+bg_executor = ThreadPoolExecutor(max_workers=4)
+
+# Initialize the Multi-Agent RAG system
+class AgenticRAG:
+    """Multi-Agent RAG with ChromaDB + Advanced Health Orchestrator"""
+
     def __init__(self):
-        self.documents = []
-        self.chunks = []
-        self.metadata = []
+        self.coordinator = CoordinatorAgent()
+        self.embedding_store = EmbeddingStore(persist_path="./chroma_advanced_v2")
+        self.coordinator.retrieval_agent.vector_store = self.embedding_store
         
-        # Enhanced TF-IDF with better parameters for semantic understanding
-        self.vectorizer = TfidfVectorizer(
-            max_features=2000,  # Increased for better accuracy
-            stop_words='english',
-            ngram_range=(1, 2),  # Include bigrams for context
-            max_df=0.95,  # Filter very common words
-            min_df=1,    # Allow rare words (needed for small docs)
-            sublinear_tf=True,  # Better scaling
-            use_idf=True
-        )
-        self.vectors = None
-        self.fitted = False
-        
-        logger.info("Production Vector Database initialized with optimized TF-IDF")
-        
-    def add_document(self, filename, text_content):
-        """Add document with professional chunking and indexing"""
-        try:
-            # Professional semantic chunking
-            chunks = self.professional_chunk_text(text_content)
-            
-            # Store document metadata
-            doc_id = len(self.documents)
-            self.documents.append({
-                'id': doc_id,
-                'filename': filename,
-                'content': text_content,
-                'chunks_count': len(chunks)
-            })
-            
-            # Process chunks
-            for i, chunk in enumerate(chunks):
-                chunk_data = {
-                    'id': len(self.chunks),
-                    'content': chunk,
-                    'filename': filename,
-                    'doc_id': doc_id,
-                    'chunk_index': i
-                }
-                self.chunks.append(chunk_data)
-            
-            # Build optimized TF-IDF index
-            self._build_vector_index()
-            
-            logger.info(f"Added {len(chunks)} chunks with optimized indexing for {filename}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error adding document: {e}")
-            return False
-    
-    def professional_chunk_text(self, text, chunk_size=400, overlap=50):
-        """Professional chunking with sentence boundary respect"""
-        import re
-        
-        # Split by sentences and paragraphs
-        sentences = re.split(r'[.!?]+|\n\n+', text)
-        chunks = []
-        current_chunk = ""
-        current_length = 0
-        
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if not sentence:
-                continue
-                
-            words = sentence.split()
-            sentence_length = len(words)
-            
-            # Smart chunking with overlap
-            if current_length + sentence_length > chunk_size and current_chunk:
-                chunks.append(current_chunk.strip())
-                
-                # Create intelligent overlap
-                previous_words = current_chunk.split()
-                overlap_words = previous_words[-overlap:] if len(previous_words) > overlap else previous_words
-                current_chunk = " ".join(overlap_words) + " " + sentence
-                current_length = len(overlap_words) + sentence_length
-            else:
-                current_chunk += " " + sentence
-                current_length += sentence_length
-        
-        # Add final chunk
-        if current_chunk.strip():
-            chunks.append(current_chunk.strip())
-        
-        return chunks
-    
-    def _build_vector_index(self):
-        """Build optimized TF-IDF vectors for all chunks"""
-        try:
-            if not self.chunks:
-                return
-                
-            chunk_texts = [chunk['content'] for chunk in self.chunks]
-            self.vectors = self.vectorizer.fit_transform(chunk_texts)
-            self.fitted = True
-            
-            logger.info(f"Built optimized TF-IDF index with {len(chunk_texts)} chunks")
-            
-        except Exception as e:
-            logger.error(f"Vector indexing error: {e}")
-    
-    def search(self, query, top_k=5, threshold=0.15):
-        """Professional search with optimized TF-IDF"""
-        if not self.fitted or not self.chunks:
-            logger.warning("No index available for search")
-            return []
-        
-        try:
-            # Vectorize query with same parameters
-            query_vector = self.vectorizer.transform([query])
-            
-            # Calculate cosine similarities
-            similarities = cosine_similarity(query_vector, self.vectors)[0]
-            
-            # Get top results above threshold
-            top_indices = np.argsort(similarities)[-top_k:][::-1]
-            
-            results = []
-            for idx in top_indices:
-                similarity = similarities[idx]
-                if similarity > threshold and idx < len(self.chunks):
-                    chunk = self.chunks[idx]
-                    results.append({
-                        'content': chunk['content'],
-                        'filename': chunk['filename'],
-                        'similarity': float(similarity),
-                        'chunk_id': chunk['id'],
-                        'metadata': {
-                            'filename': chunk['filename'],
-                            'chunk_index': chunk['chunk_index']
-                        }
-                    })
-            
-            if results:
-                logger.info(f"Search returned {len(results)} results with avg similarity: {np.mean([r['similarity'] for r in results]):.3f}")
-            else:
-                logger.info("Search returned 0 results")
-            return results
-            
-        except Exception as e:
-            logger.error(f"Search error: {e}")
-            return []
+        self.file_paths = []  # Track uploaded file paths
+        logger.info("✅ Advanced NutriMind RAG Agent System initialized!")
 
-# Initialize Modern Professional Components
-try:
-    vector_db = ModernVectorDB()
-    logger.info("Production Vector Database initialized successfully")
-except Exception as e:
-    logger.error(f"Failed to initialize Modern Vector DB: {str(e)}")
-    vector_db = None
+    def ingest_document_foreground(self, file_path, filename):
+        """Parse health report, extract clinical markers (ClinicalAnalyzerAgent) immediately"""
+        analysis = self.coordinator.analyze_document([file_path])
+        
+        if "error" in analysis:
+            logger.error(f"Error analyzing document: {analysis['error']}")
+            return {"success": False, "error": analysis["error"], "mcp_trace": analysis.get("mcp_trace", [])}
+            
+        chunks = analysis.get("chunks", [])
+        profile = analysis.get("profile", {})
+        
+        return {
+            "success": True,
+            "profile": profile,
+            "chunks": chunks,
+            "mcp_trace": analysis.get("mcp_trace", [])
+        }
 
-# Multi-Agent System disabled in production (uses TF-IDF pipeline instead)
-# Full multi-agent system available via flask_app/app.py
-coordinator = None
+    def query(self, question, profile):
+        """Run Plan-Reason-Audit multi-agent query loop with parallel vector context retrieval"""
+        # Under the hood, the CoordinatorAgent.process_health_query now executes the ChromaDB search
+        # and PubMed/UpToDate web research in parallel to minimize latency!
+        result = self.coordinator.process_health_query(question, profile)
+        return result
+
+    def clear(self):
+        """Clear all data and reset agents"""
+        self.embedding_store.clear()
+        self.file_paths = []
+        logger.info("🗑️ All agent data and ChromaDB collection cleared")
+
+rag = AgenticRAG()
 
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'pptx', 'csv', 'txt', 'md'}
-
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-def extract_text_from_file(filepath, filename):
-    """Extract text content from uploaded files"""
+def async_background_embedding(chunks, filename):
+    """Background thread function that indexes chunks in ChromaDB asynchronously"""
     try:
-        file_ext = filename.rsplit('.', 1)[1].lower()
-        
-        if file_ext == 'pdf':
-            with open(filepath, 'rb') as file:
-                reader = PyPDF2.PdfReader(file)
-                text = ""
-                for page in reader.pages:
-                    text += page.extract_text() + "\n"
-                return text
-                
-        elif file_ext == 'docx':
-            doc = docx.Document(filepath)
-            text = ""
-            for paragraph in doc.paragraphs:
-                text += paragraph.text + "\n"
-            return text
-            
-        elif file_ext == 'pptx':
-            prs = Presentation(filepath)
-            text = ""
-            for slide in prs.slides:
-                for shape in slide.shapes:
-                    if hasattr(shape, "text"):
-                        text += shape.text + "\n"
-            return text
-            
-        elif file_ext == 'csv':
-            with open(filepath, 'r', encoding='utf-8') as file:
-                csv_reader = csv.reader(file)
-                rows = list(csv_reader)
-                # Convert CSV to readable text format
-                text = ""
-                for row in rows:
-                    text += " | ".join(row) + "\n"
-                return text
-            
-        elif file_ext in ['txt', 'md']:
-            with open(filepath, 'r', encoding='utf-8') as file:
-                return file.read()
-                
+        logger.info(f"⚡ Starting async text chunk embedding for {filename} ({len(chunks)} chunks)...")
+        rag.embedding_store.add_chunks(chunks)
+        logger.info(f"✅ Async embedding completed successfully for {filename}!")
     except Exception as e:
-        logger.error(f"Error extracting text from {filename}: {str(e)}")
-        return f"Error reading file: {str(e)}"
-    
-    return "Could not extract text from this file type."
+        logger.error(f"❌ Error in async embedding for {filename}: {e}")
 
-def chunk_text(text, chunk_size=500, overlap=50):
-    """Split text into overlapping chunks for better context"""
-    words = text.split()
-    chunks = []
-    for i in range(0, len(words), chunk_size - overlap):
-        chunk = ' '.join(words[i:i + chunk_size])
-        if chunk.strip():
-            chunks.append(chunk.strip())
-    return chunks
-
-def store_document_in_vector_db(filename, text_content):
-    """Store document in professional vector database"""
-    if not vector_db:
-        return False
-    
+@app.route('/api/upload', methods=['POST'])
+def upload():
+    """Upload health reports → extract biomarkers in the foreground (fast) and index chunks in background"""
     try:
-        success = vector_db.add_document(filename, text_content)
-        
-        # Save to session for persistence
-        if success:
-            session['vector_chunks'] = vector_db.chunks
-            session.modified = True
-        
-        return success
-        
-    except Exception as e:
-        logger.error(f"Failed to store document in vector DB: {str(e)}")
-        return False
-
-def retrieve_relevant_context(query, top_k=5):
-    """Retrieve most relevant document chunks using professional vector similarity"""
-    if not vector_db:
-        return []
-    
-    try:
-        # Restore chunks from session
-        if 'vector_chunks' in session and session['vector_chunks']:
-            vector_db.chunks = session['vector_chunks']
-            if vector_db.chunks and not vector_db.fitted:
-                vector_db._build_vector_index()
-        
-        # Search for similar chunks
-        results = vector_db.search(query, top_k=top_k)
-        
-        # Format results
-        contexts = []
-        for result in results:
-            contexts.append({
-                'content': result['content'],
-                'filename': result['metadata']['filename'],
-                'similarity': result['similarity']
-            })
-        
-        logger.info(f"Retrieved {len(contexts)} relevant contexts for query")
-        return contexts
-        
-    except Exception as e:
-        logger.error(f"Failed to retrieve context: {str(e)}")
-        return []
-
-@app.route('/')
-def index():
-    if 'conversation' not in session:
-        session['conversation'] = []
-    if 'uploaded_files' not in session:
-        session['uploaded_files'] = []
-    return render_template('index.html')
-
-@app.route('/upload', methods=['POST'])
-def upload_files():
-    try:
+        # Request Validation Guards
         if 'files' not in request.files:
-            return jsonify({'error': 'No files selected'}), 400
-        
+            return jsonify({'error': 'No files uploaded'}), 400
+            
         files = request.files.getlist('files')
-        uploaded_files = []
-        
+        if not files or all(f.filename == '' for f in files):
+            return jsonify({'error': 'No valid files selected'}), 400
+            
         for file in files:
-            if file.filename == '':
-                continue
-            
-            if file and allowed_file(file.filename):
+            if file and file.filename:
+                ext = file.filename.rsplit('.', 1)[-1].lower()
+                if ext not in ALLOWED_EXTENSIONS:
+                    return jsonify({'error': f'File type not allowed: {ext}'}), 400
+                    
+        logger.info("🗑️ Clearing previous data before new upload...")
+        session_id = get_or_create_session_id()
+        # Delete existing session and messages in DB for this UUID
+        ChatMessage.query.filter_by(session_id=session_id).delete()
+        UserSession.query.filter_by(id=session_id).delete()
+        db.session.commit()
+        rag.clear()
+        processed = []
+        extracted_profile = None
+        mcp_trace = []
+
+        for file in files:
+            if file and file.filename:
                 filename = secure_filename(file.filename)
-                unique_filename = f"{uuid.uuid4()}_{filename}"
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-                
-                file.save(filepath)
-                
-                # Extract text content
-                text_content = extract_text_from_file(filepath, filename)
-                
-                # Store in vector database for professional RAG
-                vector_stored = store_document_in_vector_db(filename, text_content)
-                
-                uploaded_files.append({
-                    'filename': filename,
-                    'filepath': filepath,
-                    'content': text_content[:2000],  # Store first 2000 chars for session
-                    'vector_stored': vector_stored,
-                    'chunks_count': len(chunk_text(text_content))
-                })
-        
-        if not uploaded_files:
-            return jsonify({'error': 'No valid files uploaded'}), 400
-        
-        session['uploaded_files'] = uploaded_files
-        session.modified = True
-        
-        return jsonify({
-            'success': True,
-            'message': f'{len(uploaded_files)} file(s) uploaded and processed successfully',
-            'files': [f['filename'] for f in uploaded_files]
-        })
-    
-    except Exception as e:
-        return jsonify({'error': f'Upload failed: {str(e)}'}), 500
+                if filename.rsplit('.', 1)[-1].lower() in ALLOWED_EXTENSIONS:
+                    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    file.save(file_path)
 
-@app.route('/chat', methods=['POST'])
-def chat():
-    try:
-        data = request.get_json()
-        user_message = data.get('message', '').strip()
-        
-        if not user_message:
-            return jsonify({'error': 'Message cannot be empty'}), 400
-        
-        uploaded_files = session.get('uploaded_files', [])
-        if not uploaded_files:
-            return jsonify({'error': 'Please upload documents first'}), 400
-        
-        # TF-IDF Vector Search (Production Pipeline)
-        relevant_contexts = retrieve_relevant_context(user_message, top_k=5)
-        
-        if relevant_contexts:
-            # Use semantic vector search results
-            context_text = "\n\n".join([f"From {ctx['filename']}: {ctx['content']}" 
-                                       for ctx in relevant_contexts[:3]])
-            
-            similarity_scores = [ctx['similarity'] for ctx in relevant_contexts]
-            avg_similarity = sum(similarity_scores) / len(similarity_scores)
-            
-            logger.info(f"Using vector search with {len(relevant_contexts)} chunks, avg similarity: {avg_similarity:.3f}")
-            
-        else:
-            # Fallback to simple text search if vector DB fails
-            context_text = ""
-            for file_info in uploaded_files:
-                filepath = file_info.get('filepath')
-                filename = file_info.get('filename')
-                if filepath and os.path.exists(filepath):
-                    full_content = extract_text_from_file(filepath, filename)
-                    context_text += f"\n\n=== Content from {filename} ===\n{full_content[:3000]}\n"
-            
-            avg_similarity = 0.5  # Default similarity for fallback
-            logger.info("Using fallback text search (vector DB unavailable)")
+                    # Ingest and analyze health records (Foreground profile extraction)
+                    ingest_result = rag.ingest_document_foreground(file_path, filename)
+                    
+                    if ingest_result.get("success"):
+                        processed.append(filename)
+                        extracted_profile = ingest_result.get("profile")
+                        mcp_trace.extend(ingest_result.get("mcp_trace", []))
+                        
+                        # Fetch text chunks and dispatch to background thread pool for embedding
+                        chunks = ingest_result.get("chunks", [])
+                        if chunks:
+                            bg_executor.submit(async_background_embedding, chunks, filename)
+                    
+                    # Cleanup temp file
+                    try:
+                        os.remove(file_path)
+                    except:
+                        pass
 
-        # Generate AI response using professional RAG context
-        if model and context_text:
-            try:
-                prompt = f"""You are a professional document analysis assistant. Answer the user's question based on the provided context.
-
-RELEVANT CONTEXT:
-{context_text}
-
-USER QUESTION: {user_message}
-
-Provide a detailed, accurate answer based on the context. If the information isn't in the context, say so clearly."""
-
-                generation_config = {
-                    'temperature': 0.7,
-                    'top_p': 0.8,
-                    'top_k': 40,
-                    'max_output_tokens': 1024,
+        if processed:
+            if not extracted_profile:
+                logger.warning("⚠️ Clinical profile extraction returned empty or null. Using default baseline profile.")
+                extracted_profile = {
+                    "demographics": {"age": 30, "weight_kg": 70, "height_cm": 170, "gender": "Male", "activity_level": "Moderate"},
+                    "goals": ["General healthy living"],
+                    "allergies": [],
+                    "medical_conditions": [],
+                    "biomarkers": []
                 }
                 
-                response = model.generate_content(prompt, generation_config=generation_config)
-                ai_response = response.text.strip()
-                
-                if not ai_response:
-                    ai_response = f"I processed your documents using professional RAG (vector similarity: {avg_similarity:.1%}), but couldn't generate a response. Please try rephrasing your question."
-                    
-                logger.info("Successfully generated professional RAG response")
-                
-            except Exception as e:
-                error_msg = str(e)
-                logger.error(f"Gemini API error: {error_msg}")
-                
-                # Check if quota exceeded
-                if "429" in error_msg or "quota" in error_msg.lower():
-                    ai_response = "🚫 Daily AI quota exceeded. Here's the most relevant content from your documents:\n\n"
-                    if relevant_contexts:
-                        ai_response += relevant_contexts[0]['content'][:800]
-                    else:
-                        ai_response += "Please try again tomorrow or upgrade your API plan."
-                else:
-                    # Other API errors - provide fallback content
-                    if relevant_contexts:
-                        best_context = relevant_contexts[0]['content'][:500]
-                        ai_response = f"Based on your documents: {best_context}..." if len(best_context) == 500 else f"Based on your documents: {best_context}"
-                    else:
-                        ai_response = "I found your documents but couldn't process your question. Please try rephrasing it."
-        elif not model:
-            ai_response = f"I can see you've uploaded {len(uploaded_files)} file(s) including '{uploaded_files[0]['filename']}'. The AI service is currently being configured. Please try again in a moment."
+            user_sess = UserSession.query.filter_by(id=session_id).first()
+            if not user_sess:
+                user_sess = UserSession(
+                    id=session_id,
+                    profile_json=json.dumps(extracted_profile),
+                    uploaded_files_json=json.dumps(processed)
+                )
+                db.session.add(user_sess)
+            else:
+                user_sess.profile_json = json.dumps(extracted_profile)
+                user_sess.uploaded_files_json = json.dumps(processed)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': f'Successfully ingested {len(processed)} files. Demographics and biomarkers extracted in foreground. Document index populating asynchronously.',
+                'files': processed,
+                'profile': extracted_profile,
+                'mcp_trace': mcp_trace
+            })
         else:
-            ai_response = f"I can see you've uploaded {len(uploaded_files)} file(s), but I need document content to analyze. Please make sure your files contain readable text."
-        
-        conversation = session.get('conversation', [])
-        conversation.append({
-            'user': user_message,
-            'assistant': ai_response,
-            'metadata': {
-                'files_processed': len(uploaded_files),
-                'has_ai': bool(model),
-                'vector_search_used': bool(relevant_contexts),
-                'similarity_score': avg_similarity,
-                'chunks_retrieved': len(relevant_contexts),
-                'rag_mode': 'professional_vector' if relevant_contexts else 'fallback_text',
-                'timestamp': datetime.now().isoformat()
+            return jsonify({'error': 'Failed to extract biomarkers or no valid files processed'}), 400
+
+    except Exception as e:
+        logger.error(f"❌ Upload error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'method': 'Error in Ingestion/Analysis'
+        }), 500
+
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    """Chat → Run Plan-Reason-Audit multi-agent loop with native concurrency optimizations"""
+    try:
+        # Request Validation Guards
+        if not request.is_json:
+            return jsonify({"error": "Request must be JSON"}), 400
+        data = request.get_json()
+        if not data or 'message' not in data:
+            return jsonify({"error": "message field required"}), 400
+        question = data.get('message')
+        if not isinstance(question, str):
+            return jsonify({"error": "message must be a string"}), 400
+        question = question.strip()
+        if not question:
+            return jsonify({"error": "message cannot be empty"}), 400
+        if len(question) > 4000:
+            return jsonify({"error": "message too long (max 4000 characters)"}), 400
+
+        # Retrieve biomarker profile from SQLite
+        session_id = get_or_create_session_id()
+        user_sess = UserSession.query.filter_by(id=session_id).first()
+        profile = None
+        if user_sess and user_sess.profile_json:
+            profile = json.loads(user_sess.profile_json)
+
+        if not profile:
+            # Generate a default healthy baseline profile if user has not uploaded files yet
+            profile = {
+                "demographics": {"age": 30, "weight_kg": 70, "height_cm": 170, "gender": "Male", "activity_level": "Moderate"},
+                "goals": ["General healthy living"],
+                "allergies": [],
+                "medical_conditions": [],
+                "biomarkers": []
             }
-        })
-        session['conversation'] = conversation
-        session.modified = True
+            logger.info("No clinical profile in database. Using default healthy baseline.")
+            
+        # Ensure a parent UserSession row always exists in SQLite before adding chat messages (FOREIGN KEY safety)
+        if not user_sess:
+            user_sess = UserSession(
+                id=session_id,
+                profile_json=json.dumps(profile),
+                uploaded_files_json=json.dumps([])
+            )
+            db.session.add(user_sess)
+            db.session.commit()
+
+        # Run the full health agent pipeline via Coordinator (now parallelized)
+        result = rag.query(question, profile)
         
+        # Save structured results to SQLite session
+        if user_sess:
+            user_sess.meal_plan_json = json.dumps(result.get('meal_plan'))
+            user_sess.training_plan_json = json.dumps(result.get('training_plan'))
+            user_sess.bio_age_json = json.dumps(result.get('bio_age_results'))
+            user_sess.critique_json = json.dumps(result.get('critique'))
+            user_sess.audit_report = result.get('audit_report')
+            user_sess.corrections_json = json.dumps(result.get('corrections', []))
+        
+        # Save conversation messages to SQLite
+        user_msg = ChatMessage(session_id=session_id, role='user', content=question)
+        assistant_msg = ChatMessage(session_id=session_id, role='assistant', content=result.get('answer'))
+        db.session.add(user_msg)
+        db.session.add(assistant_msg)
+        db.session.commit()
+
         return jsonify({
             'success': True,
-            'response': ai_response,
-            'metadata': {
-                'files_processed': len(uploaded_files),
-                'has_ai': bool(model),
-                'vector_search_used': bool(relevant_contexts),
-                'similarity_score': avg_similarity,
-                'chunks_retrieved': len(relevant_contexts),
-                'rag_mode': 'professional_vector' if relevant_contexts else 'fallback_text',
-                'timestamp': datetime.now().isoformat()
-            },
-            'source_context': [ctx['content'][:200] + '...' for ctx in relevant_contexts[:3]] if relevant_contexts else []
+            'response': result.get('answer'),
+            'meal_plan': result.get('meal_plan'),
+            'training_plan': result.get('training_plan'),
+            'targets': result.get('targets'),
+            'audit_report': result.get('audit_report'),
+            'corrections': result.get('corrections', []),
+            'bio_age_results': result.get('bio_age_results'),
+            'critique': result.get('critique'),
+            'mcp_trace': result.get('mcp_trace', [])
         })
-            
+
     except Exception as e:
-        logger.error(f"Chat processing failed: {str(e)}")
+        logger.error(f"❌ Chat error: {e}")
         return jsonify({'error': f'Chat processing failed: {str(e)}'}), 500
 
-@app.route('/clear', methods=['POST'])
-def clear_conversation():
+@app.route('/api/clear', methods=['POST'])
+def clear():
+    """Clear all agent data and conversation"""
     try:
-        uploaded_files = session.get('uploaded_files', [])
-        for file_info in uploaded_files:
-            filepath = file_info.get('filepath')
-            if filepath and os.path.exists(filepath):
-                os.remove(filepath)
-        
-        session['conversation'] = []
-        session['uploaded_files'] = []
-        session.modified = True
-        
-        return jsonify({'success': True, 'message': 'Conversation cleared'})
-    
-    except Exception as e:
-        return jsonify({'error': f'Clear failed: {str(e)}'}), 500
-
-@app.route('/health')
-def health():
-    try:
-        has_files = 'uploaded_files' in session and len(session['uploaded_files']) > 0
-        
+        session_id = session.get('session_id')
+        if session_id:
+            ChatMessage.query.filter_by(session_id=session_id).delete()
+            UserSession.query.filter_by(id=session_id).delete()
+            db.session.commit()
+        session.clear()
+        rag.clear()
         return jsonify({
-            'status': 'healthy',
-            'service': 'Agentic RAG System with TF-IDF',
-            'has_files': has_files,
-            'ai_enabled': bool(model),
-            'vector_db_enabled': bool(vector_db),
-            'vector_db_fitted': vector_db.fitted if vector_db else False,
-            'multi_agent_enabled': AGENTS_AVAILABLE,
-            'rag_mode': 'tfidf_production',
-            'features': [
-                'tfidf_search', 
-                'multi_agent_coordination',
-                'advanced_chunking',
-                'voice_input',
-                '6_file_formats'
-            ],
-            'timestamp': datetime.now().isoformat(),
-            'version': '3.0.0'
+            'success': True,
+            'message': 'All clinical profiles, collections, and conversation history cleared'
         })
     except Exception as e:
-        logger.error(f"Health check error: {str(e)}")
-        return jsonify({'status': 'error', 'error': str(e)}), 500
+        logger.error(f"❌ Clear error: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to clear: {str(e)}'
+        }), 500
 
-@app.route('/favicon.ico')
-def favicon():
+@app.route('/api/report/download', methods=['GET'])
+def download_report():
+    """Download compiled high-fidelity clinical PDF report based on current session data"""
     try:
-        return app.send_static_file('favicon.ico')
-    except:
-        return '', 204
+        from flask import send_file
+        session_id = get_or_create_session_id()
+        user_sess = UserSession.query.filter_by(id=session_id).first()
+        if not user_sess or not user_sess.profile_json:
+            return jsonify({'error': 'No active clinical profile found. Please upload a report or query the agents first.'}), 400
+            
+        profile = json.loads(user_sess.profile_json)
+        
+        # Deserialize current plan structures if present
+        meal_plan = json.loads(user_sess.meal_plan_json) if user_sess.meal_plan_json else None
+        training_plan = json.loads(user_sess.training_plan_json) if user_sess.training_plan_json else None
+        bio_age_results = json.loads(user_sess.bio_age_json) if user_sess.bio_age_json else None
+        critique = json.loads(user_sess.critique_json) if user_sess.critique_json else None
+        audit_report = user_sess.audit_report
+        corrections = json.loads(user_sess.corrections_json) if user_sess.corrections_json else []
+        
+        # Compile PDF report using ReportLab
+        pdf_bytes = ClinicalReportGenerator.generate_pdf(
+            profile=profile,
+            meal_plan=meal_plan,
+            training_plan=training_plan,
+            bio_age_results=bio_age_results,
+            critique=critique,
+            audit_report=audit_report,
+            corrections=corrections
+        )
+        
+        # Serve bytes as file attachment in-memory
+        pdf_buffer = io.BytesIO(pdf_bytes)
+        pdf_buffer.seek(0)
+        return send_file(
+            pdf_buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name='NutriMind_Clinical_Report.pdf'
+        )
+    except Exception as e:
+        logger.error(f"❌ PDF generation failed: {e}")
+        return jsonify({'error': f'PDF report generation failed: {str(e)}'}), 500
+
+@app.route('/api/health', methods=['GET'])
+def health():
+    """Health check with agent status and database model details"""
+    session_id = session.get('session_id')
+    has_profile = False
+    profile = None
+    if session_id:
+        user_sess = UserSession.query.filter_by(id=session_id).first()
+        if user_sess and user_sess.profile_json:
+            has_profile = True
+            profile = json.loads(user_sess.profile_json)
+
+    return jsonify({
+        'status': 'healthy',
+        'app': 'NutriMind AI: Next-Gen Agentic Health & Diet Companion',
+        'agents': {
+            'clinical_analyzer': 'active',
+            'web_researcher': 'active',
+            'nutri_planner': 'active',
+            'safety_auditor': 'active',
+            'coordinator': 'active'
+        },
+        'vector_db': f"ChromaDB + HNSW (Model: {rag.embedding_store.model_name})",
+        'has_profile': has_profile,
+        'profile': profile
+    })
+
+# Serve built React app on any non-API route (Vite SPA support)
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve(path):
+    static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'frontend', 'dist')
+    logger.info(f"DEBUG PATH: path='{path}', static_dir='{static_dir}', exists={os.path.exists(os.path.join(static_dir, 'index.html'))}")
+    if path != "" and os.path.exists(os.path.join(static_dir, path)):
+        return send_from_directory(static_dir, path)
+    else:
+        return send_from_directory(static_dir, 'index.html')
 
 if __name__ == '__main__':
-    # Production-ready server configuration
     host = os.environ.get('HOST', '0.0.0.0')
     port = int(os.environ.get('PORT', 5000))
-    debug = app.config['DEBUG']
-    
-    logger.info(f"Starting RAG Chatbot server on {host}:{port}")
-    app.run(debug=debug, host=host, port=port)
+    logger.info(f"🚀 Starting NutriMind Agentic Health Coach on {host}:{port}!")
+    app.run(debug=app.config['DEBUG'], host=host, port=port)

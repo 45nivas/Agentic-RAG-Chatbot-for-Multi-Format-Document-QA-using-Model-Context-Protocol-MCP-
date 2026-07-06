@@ -1,3 +1,5 @@
+# NutriMind AI — Production Requirements
+# Core Flask
 setuptools>=65.0.0
 wheel>=0.38.0
 pip>=23.0.0
@@ -5,14 +7,31 @@ pip>=23.0.0
 Flask>=2.3.0
 gunicorn>=21.2.0
 python-dotenv>=1.0.0
-requests>=2.31.0
+Werkzeug>=2.3.0
+
+# Google Generative AI (Gemini LLM)
 google-generativeai>=0.3.0
 
-# Document Processing
+# Document Processing — All Formats
 PyPDF2>=3.0.0
 python-docx>=0.8.11
 python-pptx>=0.6.21
 
-# Lightweight ML (TF-IDF only)
-numpy>=1.24.0,<2.0.0
+# Advanced AI/ML Stack — Embeddings + Vector DB
+sentence-transformers>=2.2.0
+chromadb>=0.4.0
+torch>=2.0.0
+transformers>=4.30.0
+
+# Scientific Computing
+numpy>=1.24.0
 scikit-learn>=1.3.0
+
+# CORS Support for Decoupled Frontend
+flask-cors>=4.0.0
+
+# Persistent Storage Layer
+Flask-SQLAlchemy>=3.0.0
+
+# Document Generation (10/10 Wow Feature)
+reportlab>=4.0.0

@@ -1,0 +1,210 @@
+/* Import DM Sans and Lora from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Lora:ital,wght@0,400..700;1,400..700&display=swap');
+
+:root {
+  /* Premium Clinical Palette */
+  --bg-canvas: #F7F5F0;          /* Warm medical white background */
+  --bg-sidebar: #1A1A18;         /* Deep ink-black sidebar */
+  --bg-card: #FFFFFF;            /* Clinical report pure white card */
+  --brand-gold: #C8A97A;         /* Gold-amber active accent */
+  --brand-gold-light: #F4EFE6;   /* Light gold badge fill */
+  --brand-gold-dark: #A58452;    /* Dark gold border/text */
+  --border-color: #DEDAD4;       /* Fine 0.5px warm-gray border */
+  --border-light: #EBE8E3;
+  
+  /* Text colors */
+  --text-primary: #1A1A18;       /* Charcoal primary ink */
+  --text-secondary: #6A6660;     /* Muted clinical slate */
+  --text-muted: #9E9990;         /* Subtle timestamp text */
+  --text-light: #FFFFFF;         /* Reverse layout text */
+
+  /* Semantic Alerts */
+  --alert-green: #4D7C5D;
+  --alert-green-light: #EBF2ED;
+  --alert-red: #B25E5E;
+  --alert-red-light: #F9EFEF;
+
+  /* Typography */
+  --font-display: 'Lora', Georgia, serif;
+  --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  
+  /* Radii & Shadows */
+  --radius-lg: 12px;
+  --radius-md: 8px;
+  --radius-sm: 4px;
+  --shadow-flat: 0 1px 2px rgba(26, 26, 24, 0.03);
+  --shadow-card: 0 4px 20px rgba(26, 26, 24, 0.02), 0 2px 4px rgba(26, 26, 24, 0.01);
+  --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Global Reset & Base */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+/* Heading Typography Override (Lora Serif) */
+h1, h2, h3, h4, .font-serif {
+  font-family: var(--font-display);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* Text Selection Styles */
+::selection {
+  background-color: var(--brand-gold-light);
+  color: var(--text-primary);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--brand-gold);
+}
+
+/* App Core Container Layout */
+.app-container {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--bg-canvas);
+}
+
+/* Sidebar Module styles */
+.sidebar-panel {
+  width: 260px;
+  height: 100%;
+  background-color: var(--bg-sidebar);
+  color: var(--text-light);
+  display: flex;
+  flex-direction: column;
+  border-right: 0.5px solid var(--border-color);
+  z-index: 10;
+}
+
+.main-content {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  position: relative;
+}
+
+/* Card layout components */
+.clinical-card {
+  background: var(--bg-card);
+  border: 0.5px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 24px;
+  margin-bottom: 20px;
+  transition: var(--transition-smooth);
+}
+
+.clinical-card:hover {
+  border-color: var(--brand-gold);
+  box-shadow: 0 6px 24px rgba(200, 169, 122, 0.04);
+}
+
+/* Demographics profile stat cards */
+.stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: var(--bg-canvas);
+  border: 0.5px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.stat-pill.safety-green {
+  background: var(--alert-green-light);
+  border-color: var(--alert-green);
+  color: var(--alert-green);
+}
+
+.stat-pill.safety-red {
+  background: var(--alert-red-light);
+  border-color: var(--alert-red);
+  color: var(--alert-red);
+}
+
+.stat-pill.accent-gold {
+  background: var(--brand-gold-light);
+  border-color: var(--brand-gold);
+  color: var(--brand-gold-dark);
+}
+
+/* Micro-animations and loaders */
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin-slow {
+  animation: spin-slow 8s linear infinite;
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.pulse-subtle {
+  animation: pulse-subtle 2s infinite ease-in-out;
+}
+
+/* Grid helper layout */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  padding: 24px;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Responsive meal macros text */
+.meal-macros-text {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .meal-macros-text {
+    display: inline;
+  }
+}

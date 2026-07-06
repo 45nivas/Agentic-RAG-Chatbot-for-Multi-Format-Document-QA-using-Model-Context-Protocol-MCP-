@@ -34,3 +34,12 @@ scipy>=1.10.0
 # Development Tools
 ipython>=8.0.0  # For interactive development
 jupyter>=1.0.0  # For notebook experiments
+
+# CORS Support for Decoupled Frontend
+flask-cors>=4.0.0
+
+# Persistent Storage Layer
+Flask-SQLAlchemy>=3.0.0
+
+# Document Generation (10/10 Wow Feature)
+reportlab>=4.0.0
