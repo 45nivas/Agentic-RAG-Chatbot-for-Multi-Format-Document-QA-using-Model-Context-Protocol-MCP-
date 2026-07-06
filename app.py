@@ -130,6 +130,32 @@ def get_or_create_session_id():
         session.modified = True
     return session['session_id']
 
+# ==============================================================================
+# 🚀 SCALING ROADMAP & DEPLOYMENT ARCHITECTURE BOUNDARIES (Deliberate Design)
+# ==============================================================================
+# This application is intentionally deployed with `gunicorn --workers 1` because:
+#
+# 1. Process-Local Singletons:
+#    - `EmbeddingStore` (ChromaDB client) runs in-process. Multiple Gunicorn workers
+#      would spawn separate, conflicting instances of the vector database engine.
+#    - `_local_pipeline_lock` (PyTorch CPU generation mutex) is a process-local
+#      threading.Lock(). Multiple workers would violate this mutex boundary, causing
+#      concurrent CPU-bound model invocations and severe core thrashing.
+#
+# 2. Ephemeral In-Memory State:
+#    - Flask-Limiter is configured with `storage_uri="memory://"`.
+#    - Flask `SECRET_KEY` falls back to a random startup token if environment is unset.
+#    Both of these require a single-worker architecture to maintain session continuity
+#    and rate limiter consistency.
+#
+# Horizontal Scaling Checklist:
+# To scale this application beyond a single worker or container instance, you must:
+#   - Migrating Locks: Replace `_local_pipeline_lock` with a Redis-backed distributed lock.
+#   - Shared Limiter: Bind `Flask-Limiter` to a shared Redis service (`storage_uri="redis://..."`).
+#   - Session Persistence: Enforce a static, persistent `SECRET_KEY` environment variable.
+#   - Centralized Vector Search: Switch ChromaDB from in-memory/local sqlite to a hosted Vector DB (e.g. Pinecone/Qdrant).
+# ==============================================================================
+
 # Native Thread Pool for Asynchronous Background Ingestion and Parallel Executions
 bg_executor = ThreadPoolExecutor(max_workers=4)
 
