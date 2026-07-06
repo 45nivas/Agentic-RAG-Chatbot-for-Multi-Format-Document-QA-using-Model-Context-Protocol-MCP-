@@ -361,6 +361,7 @@ function App() {
   };
 
   // Safe defaults for visualization
+  const isRealTargets = targets !== null;
   const activeTargets: Targets = targets || {
     calories: profile?.demographics ? 2100 : 2000,
     protein: profile?.demographics ? 140 : 130,
