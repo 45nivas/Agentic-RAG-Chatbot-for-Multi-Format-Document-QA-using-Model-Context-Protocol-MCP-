@@ -9,6 +9,8 @@ from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor
+import time
+from functools import wraps
 
 # Set UTF-8 encoding for Windows console
 if sys.platform == 'win32':
@@ -68,6 +70,19 @@ limiter = Limiter(
 @app.errorhandler(RateLimitExceeded)
 def ratelimit_handler(e):
     return jsonify({"error": "Rate limit exceeded, please slow down"}), 429
+
+# Lightweight request timing decorator
+def time_request(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        try:
+            response = func(*args, **kwargs)
+            return response
+        finally:
+            duration = time.perf_counter() - start_time
+            logger.info(f"⏱️ {request.path} completed in {duration:.2f}s")
+    return wrapper
 
 env_secret = os.environ.get('SECRET_KEY')
 if env_secret:
@@ -220,6 +235,7 @@ def async_background_embedding(chunks, filename):
 
 @app.route('/api/upload', methods=['POST'])
 @limiter.limit("10 per minute")
+@time_request
 def upload():
     """Upload health reports → extract biomarkers in the foreground (fast) and index chunks in background"""
     try:
@@ -318,6 +334,7 @@ def upload():
 
 @app.route('/api/chat', methods=['POST'])
 @limiter.limit("20 per minute")
+@time_request
 def chat():
     """Chat → Run Plan-Reason-Audit multi-agent loop with native concurrency optimizations"""
     try:

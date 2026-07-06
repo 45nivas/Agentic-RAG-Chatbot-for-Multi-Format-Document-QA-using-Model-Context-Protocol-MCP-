@@ -436,6 +436,7 @@ function App() {
                     targets={activeTargets}
                     safetyCleared={messages[messages.length - 1]?.corrections?.length === 0}
                     correctionsCount={messages[messages.length - 1]?.corrections?.length || 0}
+                    auditHasRun={messages.length > 0 && messages[messages.length - 1]?.corrections !== undefined}
                   />
                   <FuelingRings
                     targets={activeTargets}

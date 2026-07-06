@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Activity, Flame, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { User, Activity, Flame, Shield, ShieldCheck, ShieldAlert } from 'lucide-react';
 import type { Demographics, Targets } from '../types';
 
 interface DemographicsCardProps {
@@ -7,6 +7,7 @@ interface DemographicsCardProps {
   targets: Targets | null;
   safetyCleared: boolean;
   correctionsCount: number;
+  auditHasRun: boolean;
 }
 
 export const DemographicsCard: React.FC<DemographicsCardProps> = ({
@@ -14,6 +15,7 @@ export const DemographicsCard: React.FC<DemographicsCardProps> = ({
   targets,
   safetyCleared,
   correctionsCount,
+  auditHasRun,
 }) => {
   // Safe defaults
   const age = demographics?.age ?? 30;
@@ -89,16 +91,21 @@ export const DemographicsCard: React.FC<DemographicsCardProps> = ({
           <span>Calorie Plan: <strong>{caloricTarget} kcal</strong></span>
         </div>
 
-        {/* Safety Audit cleared pill */}
-        {safetyCleared ? (
+        {/* Safety Audit status pill — three states: pending, cleared, corrected */}
+        {!auditHasRun ? (
+          <div className="stat-pill">
+            <Shield size={14} />
+            <span>Safety Audit: <strong>Pending</strong></span>
+          </div>
+        ) : safetyCleared ? (
           <div className="stat-pill safety-green">
             <ShieldCheck size={14} />
-            <span>Safety Audit: <strong>Cleared</strong></span>
+            <span>Safety Audit: <strong>No Violations Detected</strong></span>
           </div>
         ) : (
-          <div className="stat-pill safety-red">
+          <div className="stat-pill accent-gold">
             <ShieldAlert size={14} />
-            <span>Audit Alert: <strong>{correctionsCount} Flags Repaired</strong></span>
+            <span>Safety Audit: <strong>{correctionsCount} {correctionsCount === 1 ? 'Flag' : 'Flags'} Corrected</strong></span>
           </div>
         )}
       </div>

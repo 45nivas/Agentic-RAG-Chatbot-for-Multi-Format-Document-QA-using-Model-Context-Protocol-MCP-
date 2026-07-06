@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
+import time
 from .ingestion_agent import IngestionAgent
 from .retrieval_agent import RetrievalAgent
 from .llm_response_agent import LLMResponseAgent
@@ -62,6 +63,15 @@ class CoordinatorAgent:
             import re
             logger = logging.getLogger(__name__)
             
+            # Helper to time and log parallel agent contributions
+            def timed_submit(agent_name, func, *args, **kwargs):
+                start = time.perf_counter()
+                try:
+                    return func(*args, **kwargs)
+                finally:
+                    duration = time.perf_counter() - start
+                    logger.info(f"⏱️ {agent_name} contribution: {duration:.2f}s")
+            
             # Detect casual greetings/non-clinical queries to respond instantly and prevent CPU thrashing
             clean_q = re.sub(r'[^\w\s]', '', query.strip().lower())
             greetings = {"hi", "hello", "hey", "hola", "greetings", "good morning", "good afternoon", "good evening", "howdy", "yo", "hi there", "hello there", "how are you", "who are you", "what is this"}
@@ -107,6 +117,8 @@ class CoordinatorAgent:
                 if retrieved_chunks is None:
                     logger.info("⚡ Parallel Thread A: Starting vector retrieval from local ChromaDB...")
                     retrieval_future = executor.submit(
+                        timed_submit,
+                        "RetrievalAgent",
                         self.retrieval_agent.embed_and_retrieve,
                         chunks=[],  # No new chunks added during query
                         query=query,
@@ -117,6 +129,8 @@ class CoordinatorAgent:
 
                 logger.info("⚡ Parallel Thread B: Dispatching clinical search to WebResearchAgent...")
                 research_future = executor.submit(
+                    timed_submit,
+                    "WebResearchAgent",
                     self.web_researcher.perform_clinical_search,
                     search_context,
                     query
@@ -124,12 +138,16 @@ class CoordinatorAgent:
 
                 logger.info("⚡ Parallel Thread C: Dispatching biological age longevity metrics calculation...")
                 bio_age_future = executor.submit(
+                    timed_submit,
+                    "BioAgeCalculatorAgent",
                     self.bio_age_calculator.calculate_bio_age,
                     profile
                 )
 
                 logger.info("⚡ Parallel Thread D: Dispatching clinical fitness routine prescription...")
                 exercise_future = executor.submit(
+                    timed_submit,
+                    "ClinicalKinesiologyAgent",
                     self.clinical_kinesiologist.prescribe_exercise,
                     profile
                 )
@@ -156,14 +174,18 @@ class CoordinatorAgent:
 
             # Step 2: NutriPlanner (sequential, feeds on clinical search note guidelines)
             logger.info("⚡ Step 2: Generating customized nutritional guidelines and calorie/macro calculations...")
+            start_seq = time.perf_counter()
             planner_msg = self.nutri_planner.generate_plan(profile, research_note)
+            logger.info(f"⏱️ NutriPlannerAgent contribution: {time.perf_counter() - start_seq:.2f}s")
             self.mcp_trace.append(planner_msg.to_dict())
             targets = planner_msg.payload.get("targets", {})
             proposed_meals = planner_msg.payload.get("meal_plan", {})
             
             # Step 3: Safety Auditor (sequential, critiques the proposed menu & training split against limits)
             logger.info("⚡ Step 3: Performing critical allergen and kinesiological safety audit...")
+            start_seq = time.perf_counter()
             audit_msg = self.safety_auditor.audit_and_correct(profile, targets, proposed_meals, proposed_training)
+            logger.info(f"⏱️ SafetyAuditorAgent contribution: {time.perf_counter() - start_seq:.2f}s")
             self.mcp_trace.append(audit_msg.to_dict())
             
             final_meals = audit_msg.payload.get("final_meal_plan", proposed_meals)
@@ -173,7 +195,9 @@ class CoordinatorAgent:
             
             # Step 3.5: Clinical Critique (sequential, critiques the final meal + training plans and assigns a grade)
             logger.info("⚡ Step 3.5: Conducting senior medical board peer review critique...")
+            start_seq = time.perf_counter()
             critique_msg = self.clinical_critique.critique_plan(profile, targets, final_meals, final_training, research_note, audit_report)
+            logger.info(f"⏱️ ClinicalCritiqueAgent contribution: {time.perf_counter() - start_seq:.2f}s")
             self.mcp_trace.append(critique_msg.to_dict())
             critique = critique_msg.payload.get("critique", {})
             
@@ -191,7 +215,9 @@ class CoordinatorAgent:
             if active_retrieved_context:
                 context_feed.extend(active_retrieved_context)
                 
+            start_seq = time.perf_counter()
             llm_msg = self.llm_agent.generate_response(context_feed, query)
+            logger.info(f"⏱️ LLMResponseAgent contribution: {time.perf_counter() - start_seq:.2f}s")
             self.mcp_trace.append(llm_msg.to_dict())
             answer = llm_msg.payload.get("answer", "Could not generate final response.")
             

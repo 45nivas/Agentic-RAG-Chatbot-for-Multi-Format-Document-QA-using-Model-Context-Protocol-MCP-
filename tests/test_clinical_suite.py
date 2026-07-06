@@ -206,3 +206,30 @@ def test_report_generation():
     assert len(pdf_bytes) > 0
     assert pdf_bytes.startswith(b"%PDF")
 
+# 7. Gemini Timeout Fast-Fallback Verification
+def test_gemini_timeout_fallback():
+    from agents.llm_response_agent import LLMClient
+    
+    client = LLMClient()
+    
+    # Mock self.gemini.generate_content to raise a timeout-like exception
+    class DeadlineExceeded(Exception):
+        pass
+        
+    mock_gen = MagicMock(side_effect=DeadlineExceeded("Deadline Exceeded"))
+    client.gemini.generate_content = mock_gen
+    
+    # Mock get_installed_ollama_models to return empty list to force Gemini to run
+    # and call_opensource_fallback to return a successful mock string
+    with patch('agents.llm_response_agent.get_installed_ollama_models', return_value=[]), \
+         patch('agents.llm_response_agent.call_opensource_fallback', return_value="fallback_response") as mock_fallback:
+         
+        res = client.call("test query")
+        
+        # 1. Confirm that it did not retry 4 times (generate_content should have been called exactly once)
+        assert mock_gen.call_count == 1
+        
+        # 2. Confirm it fell back to opensource_fallback and returned the fallback response
+        assert res == "fallback_response"
+        mock_fallback.assert_called_once_with("test query")
+

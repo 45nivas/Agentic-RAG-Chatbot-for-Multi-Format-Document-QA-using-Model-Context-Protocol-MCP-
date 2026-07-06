@@ -83,7 +83,7 @@ def call_ollama(prompt: str) -> str:
                     "temperature": 0.2
                 }
             },
-            timeout=10.0
+            timeout=5.0
         )
         if response.status_code == 200:
             resp_json = response.json()
@@ -153,41 +153,59 @@ def call_local_transformers(prompt: str) -> str:
     try:
         from transformers import pipeline
         import torch
+        from concurrent.futures import ThreadPoolExecutor, TimeoutError
         
-        with _local_pipeline_lock:
-            if _local_pipeline is None:
-                logger.info("Initializing ultra-lightweight local open-source model (Qwen/Qwen2.5-0.5B-Instruct) on CPU...")
-                # We remove device_map="auto" to run perfectly on CPU out-of-the-box without requiring `accelerate`
-                _local_pipeline = pipeline(
-                    "text-generation",
-                    model="Qwen/Qwen2.5-0.5B-Instruct",
-                    torch_dtype=torch.float32
+        def run_inference():
+            global _local_pipeline
+            with _local_pipeline_lock:
+                if _local_pipeline is None:
+                    logger.info("Initializing ultra-lightweight local open-source model (Qwen/Qwen2.5-0.5B-Instruct) on CPU...")
+                    # We remove device_map="auto" to run perfectly on CPU out-of-the-box without requiring `accelerate`
+                    _local_pipeline = pipeline(
+                        "text-generation",
+                        model="Qwen/Qwen2.5-0.5B-Instruct",
+                        torch_dtype=torch.float32
+                    )
+            
+                # RUN THE INFERENCE INSIDE THE LOCK to prevent parallel CPU thrashing!
+                logger.info("Running local open-source model inference on CPU (serialized)...")
+                messages = [
+                    {"role": "user", "content": prompt}
+                ]
+                
+                outputs = _local_pipeline(
+                    messages,
+                    max_new_tokens=512,
+                    temperature=0.2,
+                    do_sample=True
                 )
-        
-            # RUN THE INFERENCE INSIDE THE LOCK to prevent parallel CPU thrashing!
-            logger.info("Running local open-source model inference on CPU (serialized)...")
-            messages = [
-                {"role": "user", "content": prompt}
-            ]
-            
-            outputs = _local_pipeline(
-                messages,
-                max_new_tokens=512,
-                temperature=0.2,
-                do_sample=True
-            )
-            
-            if outputs and isinstance(outputs, list):
-                gen_text = outputs[0].get("generated_text", "")
-                if isinstance(gen_text, list):
-                    for item in reversed(gen_text):
-                        if item.get("role") == "assistant":
-                            return item.get("content", "").strip()
-                elif isinstance(gen_text, str):
-                    result = gen_text
-                    if result.startswith(prompt):
-                        result = result[len(prompt):]
-                    return result.strip()
+                
+                if outputs and isinstance(outputs, list):
+                    gen_text = outputs[0].get("generated_text", "")
+                    if isinstance(gen_text, list):
+                        for item in reversed(gen_text):
+                            if item.get("role") == "assistant":
+                                return item.get("content", "").strip()
+                    elif isinstance(gen_text, str):
+                        result = gen_text
+                        if result.startswith(prompt):
+                            result = result[len(prompt):]
+                        return result.strip()
+                return ""
+
+        executor = ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(run_inference)
+        try:
+            res_text = future.result(timeout=30)
+            executor.shutdown(wait=False)
+            return res_text
+        except TimeoutError:
+            logger.error("❌ Local CPU inference exceeded 30s timeout")
+            executor.shutdown(wait=False)
+            raise TimeoutError("Local CPU inference exceeded 30s timeout")
+        except Exception as e:
+            executor.shutdown(wait=False)
+            raise e
     except Exception as e:
         logger.error(f"Failed local transformers inference: {e}")
     return ""
@@ -242,9 +260,15 @@ def resilient_llm_call(
                     
                     # If it's a quota exceeded / rate limit / 429 error, don't wait and retry!
                     # Fall back immediately to save user's time and prevent HTTP timeouts.
-                    if "429" in error_str or "quota" in error_str.lower() or "limit" in error_str.lower() or "resourceexhausted" in error_str.lower():
+                    is_quota_error = "429" in error_str or "quota" in error_str.lower() or "limit" in error_str.lower() or "resourceexhausted" in error_str.lower()
+                    
+                    exc_name = type(e).__name__.lower()
+                    is_timeout_error = "timeout" in exc_name or "deadline" in exc_name or "timedout" in exc_name or "deadlineexceeded" in exc_name or "deadline exceeded" in error_str.lower()
+                    
+                    if is_quota_error or is_timeout_error:
+                        reason = "Quota Exceeded / Rate Limited (429)" if is_quota_error else "Request Timeout (DeadlineExceeded)"
                         logger.warning(
-                            f"⚠️ Gemini API Quota Exceeded / Rate Limited (429). "
+                            f"⚠️ Gemini API {reason}. "
                             f"Skipping retries and falling back immediately."
                         )
                         break
@@ -325,7 +349,7 @@ class LLMClient:
 
     @resilient_llm_call()
     def _call_gemini_raw(self, prompt: str, generation_config: dict = None) -> str:
-        response = self.gemini.generate_content(prompt, generation_config=generation_config)
+        response = self.gemini.generate_content(prompt, generation_config=generation_config, request_options={"timeout": 15})
         if hasattr(response, "text") and response.text:
             return response.text.strip()
         else:
@@ -359,19 +383,27 @@ class LLMClient:
             logger.warning(f"⚠️ Local Ollama inference failed: {e}")
             
         # 2. Priority 2: Remote Gemini API (Fast fallback remote LLM)
-        logger.info("☁️ [Priority 2] Attempting remote Gemini API...")
-        generation_config = {}
-        if json_mode:
-            generation_config = {"response_mime_type": "application/json"}
-            
-        try:
-            response_text = self._call_gemini_raw(final_prompt, generation_config)
-            if response_text:
-                if json_mode:
-                    return clean_and_repair_json(response_text)
-                return response_text
-        except Exception as e:
-            logger.warning(f"⚠️ Gemini API failed: {e}. Falling back to open-source offline models...")
+        # DISABLE_GEMINI: Temporary local-testing toggle to skip Gemini API calls
+        # entirely and go straight to open-source fallbacks. Set DISABLE_GEMINI=true
+        # in your environment to activate. Not intended as a permanent architecture
+        # change — remove once API quota/billing is resolved.
+        if os.environ.get('DISABLE_GEMINI', 'false').lower() == 'true':
+            logger.warning("⚠️ DISABLE_GEMINI is set — skipping Gemini API, using Ollama/local fallback only.")
+        else:
+            logger.info("☁️ [Priority 2] Attempting remote Gemini API...")
+            max_tokens = int(os.environ.get('GEMINI_MAX_OUTPUT_TOKENS', 2048))
+            generation_config = {"max_output_tokens": max_tokens}
+            if json_mode:
+                generation_config["response_mime_type"] = "application/json"
+                
+            try:
+                response_text = self._call_gemini_raw(final_prompt, generation_config)
+                if response_text:
+                    if json_mode:
+                        return clean_and_repair_json(response_text)
+                    return response_text
+            except Exception as e:
+                logger.warning(f"⚠️ Gemini API failed: {e}. Falling back to open-source offline models...")
             
         # 3. Priority 3: Other open-source alternatives as a last-resort fallback (HuggingFace API -> Local CPU Transformers)
         try:
