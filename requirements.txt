@@ -10,7 +10,7 @@ python-dotenv>=1.0.0
 Werkzeug>=2.3.0
 
 # Google Generative AI (Gemini LLM)
-google-generativeai>=0.3.0
+google-genai>=0.1.1
 
 # Document Processing — All Formats
 PyPDF2>=3.0.0

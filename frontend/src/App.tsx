@@ -50,6 +50,7 @@ function App() {
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccessMsg, setUploadSuccessMsg] = useState<string | null>(null);
+  const [uploadWarning, setUploadWarning] = useState<string | null>(null);
 
   // 10/10 Showstopper states
   const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
@@ -216,6 +217,7 @@ function App() {
     try {
       setIsUploading(true);
       setUploadError(null);
+      setUploadWarning(null);
       setUploadSuccessMsg(null);
       
       const filename = fileList[0]?.name || "clinical_report.pdf";
@@ -252,6 +254,9 @@ function App() {
       }
       
       setUploadSuccessMsg(data.message);
+      if (data.extraction_incomplete) {
+        setUploadWarning(data.extraction_error || 'Profile extraction failed — using default values, please try re-uploading or check report format');
+      }
       
       // Reset meal checklists on new upload
       setCheckedMeals({ breakfast: false, lunch: false, dinner: false, snack: false });
@@ -574,6 +579,13 @@ function App() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', color: '#4D7C5D', marginTop: '16px', fontSize: '0.85rem', backgroundColor: '#EBF2ED', padding: '10px', borderRadius: '6px' }}>
                       <CheckCircle2 size={14} />
                       <span>{uploadSuccessMsg}</span>
+                    </div>
+                  )}
+
+                  {uploadWarning && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', color: '#B57C1E', marginTop: '16px', fontSize: '0.85rem', backgroundColor: '#FFF9E6', padding: '10px', borderRadius: '6px', border: '1px solid #FFEBB3' }}>
+                      <AlertCircle size={14} />
+                      <span>{uploadWarning}</span>
                     </div>
                   )}
                 </div>

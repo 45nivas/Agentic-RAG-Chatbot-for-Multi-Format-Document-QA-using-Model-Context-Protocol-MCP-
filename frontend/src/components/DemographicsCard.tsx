@@ -66,7 +66,9 @@ export const DemographicsCard: React.FC<DemographicsCardProps> = ({
         </div>
         <div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1A1A18', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            Guest Clinical Profile
+            {demographics?.name && demographics.name.trim().length > 0 
+              ? `${demographics.name}'s Clinical Profile` 
+              : 'Guest Clinical Profile'}
           </h2>
           <p style={{ fontSize: '0.85rem', color: '#6A6660', display: 'flex', gap: '8px' }}>
             <span>Age: <strong>{age}</strong></span> • 

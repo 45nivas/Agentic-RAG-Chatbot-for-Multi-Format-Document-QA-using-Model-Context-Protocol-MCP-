@@ -1,4 +1,5 @@
 export interface Demographics {
+  name: string | null;
   age: number | null;
   weight_kg: number | null;
   height_cm: number | null;

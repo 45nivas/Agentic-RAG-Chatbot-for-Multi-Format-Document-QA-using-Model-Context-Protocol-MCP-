@@ -149,7 +149,7 @@ def test_report_generation():
     from agents.report_generator import ClinicalReportGenerator
     
     profile = {
-        "demographics": {"age": 42, "weight_kg": 85, "height_cm": 180, "gender": "Male", "activity_level": "Moderate"},
+        "demographics": {"name": None, "age": 42, "weight_kg": 85, "height_cm": 180, "gender": "Male", "activity_level": "Moderate"},
         "goals": ["Optimize longevity"],
         "allergies": ["Peanuts"],
         "medical_conditions": ["Hypertension"],
@@ -217,7 +217,7 @@ def test_gemini_timeout_fallback():
         pass
         
     mock_gen = MagicMock(side_effect=DeadlineExceeded("Deadline Exceeded"))
-    client.gemini.generate_content = mock_gen
+    client.client.models.generate_content = mock_gen
     
     # Mock get_installed_ollama_models to return empty list to force Gemini to run
     # and call_opensource_fallback to return a successful mock string

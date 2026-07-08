@@ -17,16 +17,75 @@ class ClinicalAnalyzerAgent:
     def analyze_health_data(self, text_chunks: List[str]) -> MCPMessage:
         combined_text = "\n\n".join(text_chunks[:20]) # Take top chunks for analysis
         
+        def auto_close_json(s: str) -> str:
+            stack = []
+            in_string = False
+            escape = False
+            for char in s:
+                if in_string:
+                    if escape:
+                        escape = False
+                    elif char == '\\':
+                        escape = True
+                    elif char == '"':
+                        in_string = False
+                else:
+                    if char == '"':
+                        in_string = True
+                    elif char in ('{', '['):
+                        stack.append(char)
+                    elif char == '}':
+                        if stack and stack[-1] == '{':
+                            stack.pop()
+                    elif char == ']':
+                        if stack and stack[-1] == '[':
+                            stack.pop()
+            res = s
+            if in_string:
+                res += '"'
+            res = res.strip()
+            while res and res[-1] in (',', ':', ' '):
+                res = res[:-1].strip()
+            while stack:
+                val = stack.pop()
+                if val == '{':
+                    res += '}'
+                elif val == '[':
+                    res += ']'
+            return res
+
+        def clean_and_repair_json_truncated(raw_text: str) -> str:
+            from .llm_response_agent import clean_and_repair_json
+            cleaned = clean_and_repair_json(raw_text)
+            try:
+                json.loads(cleaned)
+                return cleaned
+            except Exception:
+                pass
+            for i in range(len(cleaned) - 1, -1, -1):
+                char = cleaned[i]
+                if char in (',', '}', ']', '"'):
+                    candidate = cleaned[:i+1]
+                    repaired = auto_close_json(candidate)
+                    try:
+                        json.loads(repaired)
+                        return repaired
+                    except Exception:
+                        continue
+            return cleaned
+
         prompt = f"""You are a board-certified Clinical Data Analyst. Your job is to analyze the provided patient health document and extract a comprehensive, structured clinical profile in JSON format.
 
 DOCUMENT CONTENT:
 {combined_text}
 
+Extract the patient's full name (first and last name) if present in the document (e.g. from a "Patient Name:" or "Name:" field on a lab report). Format the name in Title Case (e.g. "N Satyendra") and omit titles/honorifics (Mr., Mrs., Dr., etc.). If no patient name is found in the document, use null — do not use a placeholder like "Unknown", "Patient", or "N/A".
 Extract the following information very carefully. If a value is not explicitly present, use logical inferences or leave it empty, but extract as many biomarkers as possible.
 
 Required JSON Structure:
 {{
     "demographics": {{
+        "name": null,
         "age": null,
         "weight_kg": null,
         "height_cm": null,
@@ -63,25 +122,87 @@ Ensure your response is ONLY valid JSON, starting with {{ and ending with }}. Do
                 lines = lines[:-1]
             response_text = "\n".join(lines).strip()
             
+        profile = None
+        extraction_incomplete = False
+        extraction_error = None
+
+        from .llm_response_agent import clean_and_repair_json
+        cleaned_text = clean_and_repair_json(response_text)
+
         try:
-            profile = json.loads(response_text)
+            profile = json.loads(cleaned_text)
             logger.info("Successfully extracted structured clinical profile from document")
         except Exception as e:
-            logger.error(f"Failed to parse clinical profile JSON: {e}. Raw response: {response_text[:300]}")
-            # Fallback profile
+            try:
+                repaired_text = clean_and_repair_json_truncated(response_text)
+                profile = json.loads(repaired_text)
+                extraction_incomplete = True
+                extraction_error = f"JSON was truncated and auto-repaired. Original error: {str(e)}"
+                logger.info("Successfully repaired and parsed truncated clinical profile JSON")
+            except Exception as repair_err:
+                extraction_incomplete = True
+                extraction_error = f"JSON parse error: {str(e)}. Repair failed: {str(repair_err)}"
+                logger.error(f"Failed to parse or repair clinical profile JSON. Raw response: {response_text[:300]}")
+                profile = None
+
+        default_demographics = {
+            "age": 30,
+            "weight_kg": 75,
+            "height_cm": 175,
+            "gender": "Male",
+            "activity_level": "Moderate"
+        }
+
+        if profile:
+            if "demographics" not in profile:
+                profile["demographics"] = {"name": None, "age": 30, "weight_kg": 75, "height_cm": 175, "gender": "Male", "activity_level": "Moderate"}
+                extraction_incomplete = True
+                extraction_error = "Demographics object was not found and was defaulted."
+            else:
+                d = profile["demographics"]
+                if not isinstance(d, dict):
+                    d = {}
+                missing_fields = []
+                final_demographics = {"name": d.get("name")}
+                for field, default_val in default_demographics.items():
+                    val = d.get(field)
+                    if val is None:
+                        missing_fields.append(field)
+                        final_demographics[field] = default_val
+                    else:
+                        final_demographics[field] = val
+                profile["demographics"] = final_demographics
+                if missing_fields:
+                    extraction_incomplete = True
+                    msg = f"Demographics fields ({', '.join(missing_fields)}) were not found and fell back to defaults."
+                    extraction_error = f"{extraction_error} {msg}" if extraction_error else msg
+
+            for key, default_val in [("goals", ["General fitness and nutrition optimization"]), ("allergies", []), ("medical_conditions", []), ("biomarkers", [])]:
+                if key not in profile or not isinstance(profile[key], list):
+                    profile[key] = default_val
+                    extraction_incomplete = True
+                    msg = f"Profile field '{key}' was not found and fell back to default."
+                    extraction_error = f"{extraction_error} {msg}" if extraction_error else msg
+        else:
+            extraction_incomplete = True
+            extraction_error = "JSON parse and repair failed completely. Falling back to default profile."
             profile = {
-                "demographics": {"age": 30, "weight_kg": 75, "height_cm": 175, "gender": "Male", "activity_level": "Moderate"},
+                "demographics": {"name": None, "age": 30, "weight_kg": 75, "height_cm": 175, "gender": "Male", "activity_level": "Moderate"},
                 "goals": ["General fitness and nutrition optimization"],
                 "allergies": [],
                 "medical_conditions": [],
                 "biomarkers": []
             }
-            
+
         return MCPMessage(
             sender="ClinicalAnalyzerAgent",
             receiver="CoordinatorAgent",
             type="CLINICAL_ANALYSIS",
-            payload={"profile": profile}
+            payload={
+                "profile": profile,
+                "extraction_incomplete": extraction_incomplete,
+                "extraction_error": extraction_error
+            }
         )
 
 class WebResearchAgent:

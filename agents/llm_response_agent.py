@@ -7,7 +7,8 @@ import json
 import requests
 import threading
 from typing import List, Dict, Any
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 from .mcp import MCPMessage
 
@@ -59,8 +60,12 @@ def call_ollama(prompt: str) -> str:
     preferred = ["qwen2.5:latest", "llama3:latest", "mistral:latest", "phi3:latest", "gemma2:latest", "llama3", "mistral"]
     target_model = None
     for model in preferred:
-        if model in installed_models or any(m.startswith(model.split(':')[0]) for m in installed_models):
+        if model in installed_models:
             target_model = model
+            break
+        matching = [m for m in installed_models if m.startswith(model.split(':')[0])]
+        if matching:
+            target_model = matching[0]
             break
             
     if not target_model and installed_models:
@@ -83,7 +88,7 @@ def call_ollama(prompt: str) -> str:
                     "temperature": 0.2
                 }
             },
-            timeout=5.0
+            timeout=90.0
         )
         if response.status_code == 200:
             resp_json = response.json()
@@ -343,13 +348,41 @@ def clean_and_repair_json(raw_text: str) -> str:
 
 class LLMClient:
     def __init__(self, model: str = "gemini-2.5-flash"):
-        genai.configure(api_key=GEMINI_API_KEY)
+        self.client = genai.Client(api_key=GEMINI_API_KEY)
         self.model = model
-        self.gemini = genai.GenerativeModel(model)
 
     @resilient_llm_call()
     def _call_gemini_raw(self, prompt: str, generation_config: dict = None) -> str:
-        response = self.gemini.generate_content(prompt, generation_config=generation_config, request_options={"timeout": 15})
+        config_params = {}
+        if generation_config:
+            if "max_output_tokens" in generation_config:
+                config_params["max_output_tokens"] = generation_config["max_output_tokens"]
+            if "response_mime_type" in generation_config:
+                config_params["response_mime_type"] = generation_config["response_mime_type"]
+                
+        config = types.GenerateContentConfig(**config_params)
+        
+        from concurrent.futures import ThreadPoolExecutor, TimeoutError
+        
+        def run_call():
+            return self.client.models.generate_content(
+                model=self.model,
+                contents=prompt,
+                config=config
+            )
+            
+        executor = ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(run_call)
+        try:
+            response = future.result(timeout=15.0)
+            executor.shutdown(wait=False)
+        except TimeoutError:
+            executor.shutdown(wait=False)
+            raise TimeoutError("Gemini API call timed out after 15.0 seconds")
+        except Exception as e:
+            executor.shutdown(wait=False)
+            raise e
+            
         if hasattr(response, "text") and response.text:
             return response.text.strip()
         else:

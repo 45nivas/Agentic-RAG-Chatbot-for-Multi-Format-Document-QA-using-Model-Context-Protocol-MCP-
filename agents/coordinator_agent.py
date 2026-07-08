@@ -40,11 +40,15 @@ class CoordinatorAgent:
             self.mcp_trace.append(clinical_msg.to_dict())
             
             profile = clinical_msg.payload.get("profile", {})
+            extraction_incomplete = clinical_msg.payload.get("extraction_incomplete", False)
+            extraction_error = clinical_msg.payload.get("extraction_error")
             return {
                 "success": True,
                 "profile": profile,
                 "chunks": chunks,
                 "failed_files": failed_files,
+                "extraction_incomplete": extraction_incomplete,
+                "extraction_error": extraction_error,
                 "mcp_trace": self.mcp_trace
             }
         except Exception as e:

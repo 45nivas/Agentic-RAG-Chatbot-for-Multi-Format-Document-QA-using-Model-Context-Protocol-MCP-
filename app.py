@@ -201,6 +201,8 @@ class AgenticRAG:
             "success": True,
             "profile": profile,
             "chunks": chunks,
+            "extraction_incomplete": analysis.get("extraction_incomplete", False),
+            "extraction_error": analysis.get("extraction_error"),
             "mcp_trace": analysis.get("mcp_trace", [])
         }
 
@@ -270,6 +272,8 @@ def upload():
         rag.clear()
         processed = []
         failed = []
+        extraction_incomplete = False
+        extraction_errors = []
         extracted_profile = None
         mcp_trace = []
 
@@ -287,6 +291,10 @@ def upload():
                         processed.append(filename)
                         if "failed_files" in ingest_result:
                             failed.extend(ingest_result["failed_files"])
+                        if ingest_result.get("extraction_incomplete"):
+                            extraction_incomplete = True
+                            if ingest_result.get("extraction_error"):
+                                extraction_errors.append(f"{filename}: {ingest_result['extraction_error']}")
                         extracted_profile = ingest_result.get("profile")
                         mcp_trace.extend(ingest_result.get("mcp_trace", []))
                         
@@ -330,6 +338,8 @@ def upload():
                 'message': f'Successfully ingested {len(processed)} files. Demographics and biomarkers extracted in foreground. Document index populating asynchronously.',
                 'files': processed,
                 'profile': extracted_profile,
+                'extraction_incomplete': extraction_incomplete,
+                'extraction_error': "; ".join(extraction_errors) if extraction_errors else None,
                 'mcp_trace': mcp_trace
             })
         else:
@@ -339,7 +349,7 @@ def upload():
         logger.error(f"❌ Upload error: {e}")
         return jsonify({
             'success': False,
-            'error': str(e),
+            'error': 'An error occurred while processing your request. Please try again.',
             'method': 'Error in Ingestion/Analysis'
         }), 500
 
@@ -390,7 +400,12 @@ def chat():
                 uploaded_files_json=json.dumps([])
             )
             db.session.add(user_sess)
-            db.session.commit()
+            try:
+                db.session.commit()
+            except Exception as commit_err:
+                db.session.rollback()
+                logger.error(f"❌ UserSession save commit failed: {commit_err}")
+                raise
 
         # Run the full health agent pipeline via Coordinator (now parallelized)
         result = rag.query(question, profile)
@@ -409,7 +424,12 @@ def chat():
         assistant_msg = ChatMessage(session_id=session_id, role='assistant', content=result.get('answer'))
         db.session.add(user_msg)
         db.session.add(assistant_msg)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as commit_err:
+            db.session.rollback()
+            logger.error(f"❌ ChatMessage save commit failed: {commit_err}")
+            raise
 
         return jsonify({
             'success': True,
@@ -426,7 +446,7 @@ def chat():
 
     except Exception as e:
         logger.error(f"❌ Chat error: {e}")
-        return jsonify({'error': f'Chat processing failed: {str(e)}'}), 500
+        return jsonify({'error': 'An error occurred while processing your request. Please try again.'}), 500
 
 @app.route('/api/clear', methods=['POST'])
 def clear():
@@ -447,7 +467,7 @@ def clear():
         logger.error(f"❌ Clear error: {e}")
         return jsonify({
             'success': False,
-            'error': f'Failed to clear: {str(e)}'
+            'error': 'An error occurred while processing your request. Please try again.'
         }), 500
 
 @app.route('/api/report/download', methods=['GET'])
@@ -492,7 +512,7 @@ def download_report():
         )
     except Exception as e:
         logger.error(f"❌ PDF generation failed: {e}")
-        return jsonify({'error': f'PDF report generation failed: {str(e)}'}), 500
+        return jsonify({'error': 'An error occurred while processing your request. Please try again.'}), 500
 
 @app.route('/api/health', methods=['GET'])
 def health():
