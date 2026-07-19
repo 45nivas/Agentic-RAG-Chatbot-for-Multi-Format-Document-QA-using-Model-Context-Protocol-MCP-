@@ -20,12 +20,13 @@ export const BiomarkersSnapshot: React.FC<BiomarkersSnapshotProps> = ({ biomarke
 
   // Helper to determine indicator position (percentage 0 to 100) on the horizontal bar
   const getPositionPercent = (biomarker: Biomarker): number => {
-    const status = biomarker.status.toLowerCase();
+    const status = (biomarker.status || 'Normal').toLowerCase();
     
     // Attempt numeric parsing for better accuracy
     try {
       const val = biomarker.value;
-      const rangeMatch = biomarker.normal_range.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)/);
+      const normalRange = biomarker.normal_range || '';
+      const rangeMatch = normalRange.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)/);
       
       if (rangeMatch) {
         const min = parseFloat(rangeMatch[1]);
@@ -61,7 +62,7 @@ export const BiomarkersSnapshot: React.FC<BiomarkersSnapshotProps> = ({ biomarke
   };
 
   const getStatusColor = (status: string) => {
-    const s = status.toLowerCase();
+    const s = (status || 'Normal').toLowerCase();
     if (s.includes('normal') || s.includes('optimal')) return '#4D7C5D'; // Medical green
     if (s.includes('low') || s.includes('deficient')) return '#B25E5E';  // Deficient red
     return '#C8A97A'; // Elevated gold
@@ -110,12 +111,12 @@ export const BiomarkersSnapshot: React.FC<BiomarkersSnapshotProps> = ({ biomarke
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
                   <span style={{ fontWeight: 600, fontSize: '0.95rem', color: '#1A1A18' }}>{bio.name}</span>
-                  <span style={{ fontSize: '0.75rem', color: '#9E9990', marginLeft: '6px' }}>Normal: {bio.normal_range}</span>
+                  <span style={{ fontSize: '0.75rem', color: '#9E9990', marginLeft: '6px' }}>Normal: {bio.normal_range || 'N/A'}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1A1A18' }}>
                     {bio.value}
-                    <span style={{ fontSize: '0.75rem', color: '#6A6660', fontWeight: 400, marginLeft: '2px' }}>{bio.unit}</span>
+                    <span style={{ fontSize: '0.75rem', color: '#6A6660', fontWeight: 400, marginLeft: '2px' }}>{bio.unit || ''}</span>
                   </span>
                   <span style={{
                     fontSize: '0.7rem',
@@ -127,7 +128,7 @@ export const BiomarkersSnapshot: React.FC<BiomarkersSnapshotProps> = ({ biomarke
                     borderRadius: '4px',
                     border: `0.5px solid ${statusColor}40`
                   }}>
-                    {bio.status}
+                    {bio.status || 'Normal'}
                   </span>
                 </div>
               </div>
@@ -186,7 +187,7 @@ export const BiomarkersSnapshot: React.FC<BiomarkersSnapshotProps> = ({ biomarke
                 marginTop: '4px',
                 lineHeight: '1.4'
               }}>
-                <strong>Clinical Insight:</strong> {bio.clinical_significance}
+                <strong>Clinical Insight:</strong> {bio.clinical_significance || 'No clinical insight available.'}
               </div>
 
             </div>
