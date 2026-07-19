@@ -51,6 +51,8 @@ function App() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccessMsg, setUploadSuccessMsg] = useState<string | null>(null);
   const [uploadWarning, setUploadWarning] = useState<string | null>(null);
+  const [reducedClinicalGrounding, setReducedClinicalGrounding] = useState<boolean>(false);
+  const [clinicalGroundingExplanation, setClinicalGroundingExplanation] = useState<string | null>(null);
 
   // 10/10 Showstopper states
   const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
@@ -218,6 +220,8 @@ function App() {
       setIsUploading(true);
       setUploadError(null);
       setUploadWarning(null);
+      setReducedClinicalGrounding(false);
+      setClinicalGroundingExplanation(null);
       setUploadSuccessMsg(null);
       
       const filename = fileList[0]?.name || "clinical_report.pdf";
@@ -307,7 +311,9 @@ function App() {
         corrections: data.corrections || [],
         bioAgeResults: data.bio_age_results || null,
         critique: data.critique || null,
-        mcpTrace: data.mcp_trace || []
+        mcpTrace: data.mcp_trace || [],
+        reducedClinicalGrounding: data.reduced_clinical_grounding || false,
+        clinicalGroundingExplanation: data.clinical_grounding_explanation || undefined,
       };
 
       // If clinical agents generated target calculations, update local states
@@ -326,6 +332,8 @@ function App() {
       if (data.mcp_trace) {
         setMcpTraces(prev => [...prev, ...data.mcp_trace]);
       }
+      setReducedClinicalGrounding(!!data.reduced_clinical_grounding);
+      setClinicalGroundingExplanation(data.clinical_grounding_explanation || null);
 
       setMessages(prev => [...prev, coachMsg]);
 
@@ -354,6 +362,8 @@ function App() {
         setBioAgeResults(null);
         setMcpTraces([]);
         setMessages([]);
+        setReducedClinicalGrounding(false);
+        setClinicalGroundingExplanation(null);
         setCheckedMeals({ breakfast: false, lunch: false, dinner: false, snack: false });
         setConsumedMacros({ calories: 0, protein: 0, carbs: 0, fats: 0 });
         setUploadSuccessMsg('Vector database collection successfully purged.');
@@ -457,6 +467,14 @@ function App() {
                 {/* Right Column: BioAge, Meal Program, Workout Program */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <BioAgeCard bioAgeResults={bioAgeResults} />
+                  
+                  {reducedClinicalGrounding && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', color: '#B57C1E', fontSize: '0.85rem', backgroundColor: '#FFF9E6', padding: '10px', borderRadius: '6px', border: '1px solid #FFEBB3' }}>
+                      <AlertCircle size={14} />
+                      <span>{clinicalGroundingExplanation || 'This meal plan was generated without full clinical literature grounding.'}</span>
+                    </div>
+                  )}
+
                   <MealProgram
                     mealPlan={mealPlan}
                     checkedMeals={checkedMeals}

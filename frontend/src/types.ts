@@ -90,6 +90,8 @@ export interface ChatMessage {
   bioAgeResults?: BioAgeResults;
   critique?: any;
   mcpTrace?: AgentTrace[];
+  reducedClinicalGrounding?: boolean;
+  clinicalGroundingExplanation?: string;
 }
 
 export interface HealthCheckResponse {

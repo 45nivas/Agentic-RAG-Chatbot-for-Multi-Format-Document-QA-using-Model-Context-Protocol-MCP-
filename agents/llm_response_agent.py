@@ -374,11 +374,11 @@ class LLMClient:
         executor = ThreadPoolExecutor(max_workers=1)
         future = executor.submit(run_call)
         try:
-            response = future.result(timeout=15.0)
+            response = future.result(timeout=30.0)
             executor.shutdown(wait=False)
         except TimeoutError:
             executor.shutdown(wait=False)
-            raise TimeoutError("Gemini API call timed out after 15.0 seconds")
+            raise TimeoutError("Gemini API call timed out after 30.0 seconds")
         except Exception as e:
             executor.shutdown(wait=False)
             raise e
@@ -424,10 +424,12 @@ class LLMClient:
             logger.warning("⚠️ DISABLE_GEMINI is set — skipping Gemini API, using Ollama/local fallback only.")
         else:
             logger.info("☁️ [Priority 2] Attempting remote Gemini API...")
-            max_tokens = int(os.environ.get('GEMINI_MAX_OUTPUT_TOKENS', 2048))
-            generation_config = {"max_output_tokens": max_tokens}
-            if json_mode:
-                generation_config["response_mime_type"] = "application/json"
+            generation_config = {}
+            if not json_mode:
+                max_tokens = int(os.environ.get('GEMINI_MAX_OUTPUT_TOKENS', 4096))
+                generation_config["max_output_tokens"] = max_tokens
+            # Bypassing response_mime_type="application/json" and max_output_tokens in JSON mode to prevent premature truncation
+            pass
                 
             try:
                 response_text = self._call_gemini_raw(final_prompt, generation_config)

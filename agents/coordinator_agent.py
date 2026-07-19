@@ -95,8 +95,8 @@ class CoordinatorAgent:
                 return {
                     "success": True,
                     "answer": greeting_msg,
-                    "meal_plan": None,
-                    "training_plan": None,
+                    "meal_plan": {},
+                    "training_plan": {},
                     "targets": None,
                     "audit_report": "Casual greeting detected. Safety audit bypassed.",
                     "corrections": [],
@@ -109,14 +109,18 @@ class CoordinatorAgent:
                             "type": "GREETING",
                             "payload": {"answer": greeting_msg}
                         }
-                    ]
+                    ],
+                    "degraded_agents": [],
+                    "reduced_clinical_grounding": False,
+                    "clinical_grounding_explanation": None
                 }
 
             from concurrent.futures import ThreadPoolExecutor
 
             conditions = profile.get("medical_conditions", [])
-            biomarkers = [b["name"] for b in profile.get("biomarkers", [])]
+            biomarkers = [b.get("name") for b in profile.get("biomarkers", []) if isinstance(b, dict) and b.get("name")]
             search_context = conditions + biomarkers
+            degraded_agents = []
             
             # Step 1: Execute local ChromaDB retrieval, web research, bio-age calculation, and kinesiology split in parallel!
             with ThreadPoolExecutor(max_workers=4) as executor:
@@ -158,25 +162,53 @@ class CoordinatorAgent:
                     profile
                 )
 
-                # Wait for threads and collect results
-                research_msg = research_future.result()
-                self.mcp_trace.append(research_msg.to_dict())
-                research_note = research_msg.payload.get("research_note", "")
+                # Wait for threads and collect results with individual try/except wrappers
+                
+                # A. WebResearchAgent
+                try:
+                    research_msg = research_future.result()
+                    self.mcp_trace.append(research_msg.to_dict())
+                    research_note = research_msg.payload.get("research_note", "")
+                except Exception as e:
+                    logger.error(f"❌ WebResearchAgent failed: {e}", exc_info=True)
+                    degraded_agents.append("WebResearchAgent")
+                    research_note = ""
 
-                bio_age_msg = bio_age_future.result()
-                self.mcp_trace.append(bio_age_msg.to_dict())
-                bio_age_results = bio_age_msg.payload.get("bio_age_results", {})
+                # B. BioAgeCalculatorAgent
+                try:
+                    bio_age_msg = bio_age_future.result()
+                    self.mcp_trace.append(bio_age_msg.to_dict())
+                    bio_age_results = bio_age_msg.payload.get("bio_age_results", {})
+                except Exception as e:
+                    logger.error(f"❌ BioAgeCalculatorAgent failed: {e}", exc_info=True)
+                    degraded_agents.append("BioAgeCalculatorAgent")
+                    bio_age_results = None
 
-                exercise_msg = exercise_future.result()
-                self.mcp_trace.append(exercise_msg.to_dict())
-                proposed_training = exercise_msg.payload.get("training_plan", {})
+                # C. ClinicalKinesiologyAgent
+                try:
+                    exercise_msg = exercise_future.result()
+                    self.mcp_trace.append(exercise_msg.to_dict())
+                    proposed_training = exercise_msg.payload.get("training_plan", {})
+                except Exception as e:
+                    logger.error(f"❌ ClinicalKinesiologyAgent failed: {e}", exc_info=True)
+                    degraded_agents.append("ClinicalKinesiologyAgent")
+                    proposed_training = {}
 
+                # D. RetrievalAgent
                 if retrieval_future:
-                    retrieval_msg = retrieval_future.result()
-                    self.mcp_trace.append(retrieval_msg.to_dict())
-                    active_retrieved_context = retrieval_msg.payload.get("retrieved_context", [])
+                    try:
+                        retrieval_msg = retrieval_future.result()
+                        self.mcp_trace.append(retrieval_msg.to_dict())
+                        active_retrieved_context = retrieval_msg.payload.get("retrieved_context", [])
+                    except Exception as e:
+                        logger.error(f"❌ RetrievalAgent failed: {e}", exc_info=True)
+                        degraded_agents.append("RetrievalAgent")
+                        active_retrieved_context = []
                 else:
                     active_retrieved_context = retrieved_chunks or []
+
+            reduced_clinical_grounding = not research_note and "WebResearchAgent" in degraded_agents
+            clinical_grounding_explanation = "Meal plan generated without literature-backed clinical guidelines due to a research service issue." if reduced_clinical_grounding else None
 
             # Step 2: NutriPlanner (sequential, feeds on clinical search note guidelines)
             logger.info("⚡ Step 2: Generating customized nutritional guidelines and calorie/macro calculations...")
@@ -237,22 +269,28 @@ class CoordinatorAgent:
                 "corrections": corrections,
                 "bio_age_results": bio_age_results,
                 "critique": critique,
-                "mcp_trace": self.mcp_trace
+                "mcp_trace": self.mcp_trace,
+                "degraded_agents": degraded_agents,
+                "reduced_clinical_grounding": reduced_clinical_grounding,
+                "clinical_grounding_explanation": clinical_grounding_explanation
             }
             
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
-            logger.error(f"❌ Error coordinating agents: {e}")
+            logger.error(f"❌ Error coordinating agents: {e}", exc_info=True)
             error_msg = MCPMessage(
                 sender="CoordinatorAgent",
                 receiver="UI",
                 type="ERROR",
-                payload={"error": str(e)}
+                payload={"error": "An internal error occurred during coordination."}
             )
             self.mcp_trace.append(error_msg.to_dict())
             return {
                 "success": False,
-                "answer": f"I encountered an error while coordinating the clinical agents: {str(e)}",
-                "mcp_trace": self.mcp_trace
+                "answer": "I encountered an issue while generating your health analysis. Please try again, or rephrase your question.",
+                "mcp_trace": self.mcp_trace,
+                "degraded_agents": [],
+                "reduced_clinical_grounding": False,
+                "clinical_grounding_explanation": None
             }

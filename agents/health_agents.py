@@ -147,15 +147,15 @@ Ensure your response is ONLY valid JSON, starting with {{ and ending with }}. Do
 
         default_demographics = {
             "age": 30,
-            "weight_kg": 75,
-            "height_cm": 175,
+            "weight_kg": 75.0,
+            "height_cm": 175.0,
             "gender": "Male",
             "activity_level": "Moderate"
         }
 
         if profile:
             if "demographics" not in profile:
-                profile["demographics"] = {"name": None, "age": 30, "weight_kg": 75, "height_cm": 175, "gender": "Male", "activity_level": "Moderate"}
+                profile["demographics"] = {"name": None, "age": 30, "weight_kg": 75.0, "height_cm": 175.0, "gender": "Male", "activity_level": "Moderate"}
                 extraction_incomplete = True
                 extraction_error = "Demographics object was not found and was defaulted."
             else:
@@ -166,11 +166,26 @@ Ensure your response is ONLY valid JSON, starting with {{ and ending with }}. Do
                 final_demographics = {"name": d.get("name")}
                 for field, default_val in default_demographics.items():
                     val = d.get(field)
-                    if val is None:
+                    if val is None or val == "":
                         missing_fields.append(field)
                         final_demographics[field] = default_val
                     else:
-                        final_demographics[field] = val
+                        if field == "age":
+                            try:
+                                final_demographics[field] = int(float(val))
+                            except (ValueError, TypeError):
+                                logger.debug(f"Demographics field 'age' value '{val}' was non-numeric; using default {default_val}.")
+                                missing_fields.append(field)
+                                final_demographics[field] = default_val
+                        elif field in ["weight_kg", "height_cm"]:
+                            try:
+                                final_demographics[field] = float(val)
+                            except (ValueError, TypeError):
+                                logger.debug(f"Demographics field '{field}' value '{val}' was non-numeric; using default {default_val}.")
+                                missing_fields.append(field)
+                                final_demographics[field] = default_val
+                        else:
+                            final_demographics[field] = val
                 profile["demographics"] = final_demographics
                 if missing_fields:
                     extraction_incomplete = True
@@ -324,9 +339,18 @@ class NutriPlannerAgent:
         
     def generate_plan(self, profile: Dict[str, Any], research_note: str) -> MCPMessage:
         demographics = profile.get("demographics", {})
-        age = demographics.get("age") or 30
-        weight = demographics.get("weight_kg") or 70
-        height = demographics.get("height_cm") or 170
+        try:
+            age = float(demographics.get("age") or 30)
+        except (ValueError, TypeError):
+            age = 30.0
+        try:
+            weight = float(demographics.get("weight_kg") or 70)
+        except (ValueError, TypeError):
+            weight = 70.0
+        try:
+            height = float(demographics.get("height_cm") or 170)
+        except (ValueError, TypeError):
+            height = 170.0
         gender = demographics.get("gender") or "Male"
         activity_level = demographics.get("activity_level") or "Moderate"
         goals = profile.get("goals", [])

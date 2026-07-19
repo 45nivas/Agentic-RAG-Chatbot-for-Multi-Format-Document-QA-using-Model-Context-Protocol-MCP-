@@ -441,7 +441,9 @@ def chat():
             'corrections': result.get('corrections', []),
             'bio_age_results': result.get('bio_age_results'),
             'critique': result.get('critique'),
-            'mcp_trace': result.get('mcp_trace', [])
+            'mcp_trace': result.get('mcp_trace', []),
+            'reduced_clinical_grounding': result.get('reduced_clinical_grounding', False),
+            'clinical_grounding_explanation': result.get('clinical_grounding_explanation')
         })
 
     except Exception as e:
