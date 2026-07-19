@@ -181,7 +181,10 @@ function App() {
       let currentIndex = 0;
       const interval = setInterval(() => {
         if (currentIndex < logs.length) {
-          setTelemetryLogs(prev => [...prev, logs[currentIndex]]);
+          const entry = logs[currentIndex];
+          if (entry !== undefined) {
+            setTelemetryLogs(prev => [...prev, entry]);
+          }
           currentIndex++;
         } else {
           clearInterval(interval);
@@ -533,7 +536,7 @@ function App() {
                         <span>CLINICAL OCR TELEMETRY CORE</span>
                         <span className="animate-pulse">● ACTIVE</span>
                       </div>
-                      {telemetryLogs.map((log, idx) => {
+                      {telemetryLogs.filter(Boolean).map((log, idx) => {
                         let color = '#34D399'; // Default green
                         if (log.startsWith('[SUCCESS]')) color = '#10B981'; // emerald
                         if (log.startsWith('[INGESTION]')) color = '#60A5FA'; // blue
