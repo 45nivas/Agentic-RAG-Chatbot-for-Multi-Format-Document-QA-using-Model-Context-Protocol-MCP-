@@ -57,7 +57,7 @@ function App() {
   // 10/10 Showstopper states
   const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
   const [showTelemetry, setShowTelemetry] = useState<boolean>(false);
-  const [telemetryStages, setTelemetryStages] = useState<{text: string, status: 'pending' | 'active' | 'done' | 'error'}[]>([]);
+  const [telemetryStages, setTelemetryStages] = useState<{text: string, status: 'pending' | 'active' | 'done' | 'partial' | 'error'}[]>([]);
 
   // Database clear state
   const [isClearingDb, setIsClearingDb] = useState<boolean>(false);
@@ -237,16 +237,23 @@ function App() {
       const patientName = demographics.name || 'Unknown';
       const age = demographics.age || '?';
 
-      const extractionLines: {text: string, status: 'done' | 'error'}[] = [];
-      extractionLines.push({
-        text: `[EXTRACTED] Patient: ${patientName}, Age: ${age} — ${biomarkerCount} biomarker(s) found`,
-        status: 'done'
-      });
+      const extractionLines: {text: string, status: 'done' | 'partial' | 'error'}[] = [];
 
       if (data.extraction_incomplete) {
+        // Defaulted values — show honestly as partial, not confident
+        extractionLines.push({
+          text: `[EXTRACTED] Patient: ${patientName}, Age: ${age} — ${biomarkerCount} biomarker(s) found (some fields defaulted)`,
+          status: 'partial'
+        });
         extractionLines.push({
           text: `[WARNING] ${data.extraction_error || 'Some fields could not be extracted — defaults applied'}`,
           status: 'error'
+        });
+      } else {
+        // Fully genuine extraction
+        extractionLines.push({
+          text: `[EXTRACTED] Patient: ${patientName}, Age: ${age} — ${biomarkerCount} biomarker(s) found`,
+          status: 'done'
         });
       }
 
@@ -558,8 +565,9 @@ function App() {
                         if (stage.status === 'done' && stage.text.startsWith('[SUCCESS]')) color = '#10B981';
                         else if (stage.status === 'done' && stage.text.startsWith('[EXTRACTED]')) color = '#A78BFA';
                         else if (stage.status === 'done') color = '#34D399';
+                        if (stage.status === 'partial') color = '#FBBF24'; // amber: partially extracted
                         if (stage.status === 'error') color = '#F87171'; // red
-                        const prefix = stage.status === 'active' ? '⟳ ' : stage.status === 'done' ? '✓ ' : stage.status === 'error' ? '✗ ' : '○ ';
+                        const prefix = stage.status === 'active' ? '⟳ ' : stage.status === 'done' ? '✓ ' : stage.status === 'partial' ? '⚠ ' : stage.status === 'error' ? '✗ ' : '○ ';
                         return (
                           <div key={idx} style={{ color, marginBottom: '4px', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
                             <span style={{ flexShrink: 0 }}>{prefix}</span>
