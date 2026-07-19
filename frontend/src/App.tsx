@@ -56,8 +56,8 @@ function App() {
 
   // 10/10 Showstopper states
   const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
-  const [telemetryLogs, setTelemetryLogs] = useState<string[]>([]);
   const [showTelemetry, setShowTelemetry] = useState<boolean>(false);
+  const [telemetryStages, setTelemetryStages] = useState<{text: string, status: 'pending' | 'active' | 'done' | 'error'}[]>([]);
 
   // Database clear state
   const [isClearingDb, setIsClearingDb] = useState<boolean>(false);
@@ -161,38 +161,7 @@ function App() {
     }
   };
 
-  const runTelemetrySimulation = (filename: string): Promise<void> => {
-    return new Promise((resolve) => {
-      setShowTelemetry(true);
-      setTelemetryLogs([]);
-      
-      const logs = [
-        `[INGESTION] Ingesting file '${filename}' successfully.`,
-        `[PARSER] Partitioning text into structured semantic chunks...`,
-        `[OCR] Scanned Page 1: Extracted demographics (Age 42, Weight 88kg, Height 174cm, Male).`,
-        `[OCR] Scanned Page 1: Scanned biomarker (Glucose - 128 mg/dL - Elevated).`,
-        `[OCR] Scanned Page 1: Scanned biomarker (LDL Cholesterol - 148 mg/dL - Elevated).`,
-        `[OCR] Scanned Page 1: Scanned biomarker (HbA1c - 7.2% - Elevated).`,
-        `[VECTOR ENGINE] Initializing sentence-transformer vector pipeline...`,
-        `[CHROMA DB] Embedded and indexed 3 text chunks in docs_neuml_pubmedbert_base_embeddings.`,
-        `[SUCCESS] Patient profile loaded into memory. Updating range sliders!`
-      ];
 
-      let currentIndex = 0;
-      const interval = setInterval(() => {
-        if (currentIndex < logs.length) {
-          const entry = logs[currentIndex];
-          if (entry !== undefined) {
-            setTelemetryLogs(prev => [...prev, entry]);
-          }
-          currentIndex++;
-        } else {
-          clearInterval(interval);
-          resolve();
-        }
-      }, 550);
-    });
-  };
 
   const handleExportPdf = async () => {
     try {
@@ -226,14 +195,29 @@ function App() {
       setReducedClinicalGrounding(false);
       setClinicalGroundingExplanation(null);
       setUploadSuccessMsg(null);
-      
-      const filename = fileList[0]?.name || "clinical_report.pdf";
-      const telemetryPromise = runTelemetrySimulation(filename);
+
+      const filename = fileList[0]?.name || 'clinical_report.pdf';
+
+      // Stage 1: Uploading
+      setShowTelemetry(true);
+      setTelemetryStages([
+        { text: `[UPLOAD] Uploading '${filename}'...`, status: 'active' },
+        { text: '[PARSER] Parsing document and extracting text...', status: 'pending' },
+        { text: '[VECTOR ENGINE] Biomedical embedding pipeline (PubMedBERT)', status: 'pending' },
+        { text: '[CHROMA DB] Indexing into vector database', status: 'pending' },
+      ]);
 
       const formData = new FormData();
       for (let i = 0; i < fileList.length; i++) {
         formData.append('files', fileList[i]);
       }
+
+      // Stage 2: Request in flight — parsing
+      setTelemetryStages(prev => prev.map((s, i) =>
+        i === 0 ? { ...s, text: `[UPLOAD] Uploaded '${filename}'`, status: 'done' }
+        : i === 1 ? { ...s, status: 'active' }
+        : s
+      ));
 
       const res = await fetch('/api/upload', {
         method: 'POST',
@@ -241,15 +225,40 @@ function App() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Failed to analyze documents');
       }
 
       const data = await res.json();
-      
-      // Await high-tech visual telemetry printout to finish!
-      await telemetryPromise;
-      
+
+      // Stage 3: API responded — build real extraction summary
+      const demographics = data.profile?.demographics || {};
+      const biomarkerCount = (data.profile?.biomarkers || []).length;
+      const patientName = demographics.name || 'Unknown';
+      const age = demographics.age || '?';
+
+      const extractionLines: {text: string, status: 'done' | 'error'}[] = [];
+      extractionLines.push({
+        text: `[EXTRACTED] Patient: ${patientName}, Age: ${age} — ${biomarkerCount} biomarker(s) found`,
+        status: 'done'
+      });
+
+      if (data.extraction_incomplete) {
+        extractionLines.push({
+          text: `[WARNING] ${data.extraction_error || 'Some fields could not be extracted — defaults applied'}`,
+          status: 'error'
+        });
+      }
+
+      setTelemetryStages([
+        { text: `[UPLOAD] Uploaded '${filename}'`, status: 'done' },
+        { text: '[PARSER] Document parsed and text extracted', status: 'done' },
+        { text: '[VECTOR ENGINE] Embedded via PubMedBERT sentence-transformer', status: 'done' },
+        { text: '[CHROMA DB] Indexed into vector store', status: 'done' },
+        ...extractionLines,
+        { text: '[SUCCESS] Patient profile loaded into memory', status: 'done' },
+      ]);
+
       // Update local profile and tracking
       setProfile(data.profile);
       setMealPlan(null);
@@ -259,20 +268,24 @@ function App() {
       if (data.mcp_trace) {
         setMcpTraces(data.mcp_trace);
       }
-      
+
       setUploadSuccessMsg(data.message);
       if (data.extraction_incomplete) {
         setUploadWarning(data.extraction_error || 'Profile extraction failed — using default values, please try re-uploading or check report format');
       }
-      
+
       // Reset meal checklists on new upload
       setCheckedMeals({ breakfast: false, lunch: false, dinner: false, snack: false });
 
     } catch (e: any) {
       setUploadError(e.message || 'File upload failed');
+      // Show error state in telemetry panel
+      setTelemetryStages(prev => [
+        ...prev.map(s => s.status === 'active' ? { ...s, status: 'error' as const } : s),
+        { text: `[ERROR] ${e.message || 'Upload failed'}`, status: 'error' as const }
+      ]);
     } finally {
       setIsUploading(false);
-      setShowTelemetry(false);
     }
   };
 
@@ -532,23 +545,30 @@ function App() {
                       lineHeight: '1.5',
                       width: '100%'
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333333', paddingBottom: '6px', marginBottom: '10px', color: '#888888', fontSize: '0.75rem' }}>
-                        <span>CLINICAL OCR TELEMETRY CORE</span>
-                        <span className="animate-pulse">● ACTIVE</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333333', paddingBottom: '6px', marginBottom: '4px', color: '#888888', fontSize: '0.75rem' }}>
+                        <span>CLINICAL INGESTION PIPELINE</span>
+                        {isUploading ? <span className="animate-pulse">● PROCESSING</span> : <span>● COMPLETE</span>}
                       </div>
-                      {telemetryLogs.filter(Boolean).map((log, idx) => {
-                        let color = '#34D399'; // Default green
-                        if (log.startsWith('[SUCCESS]')) color = '#10B981'; // emerald
-                        if (log.startsWith('[INGESTION]')) color = '#60A5FA'; // blue
-                        if (log.startsWith('[PARSER]')) color = '#FBBF24'; // amber
+                      <div style={{ color: '#666666', fontSize: '0.7rem', marginBottom: '10px', lineHeight: '1.3' }}>
+                        Your document is converted into searchable data using ChromaDB (vector database) and a biomedical AI model (PubMedBERT).
+                      </div>
+                      {telemetryStages.map((stage, idx) => {
+                        let color = '#555555'; // pending: dim
+                        if (stage.status === 'active') color = '#60A5FA'; // blue: in progress
+                        if (stage.status === 'done' && stage.text.startsWith('[SUCCESS]')) color = '#10B981';
+                        else if (stage.status === 'done' && stage.text.startsWith('[EXTRACTED]')) color = '#A78BFA';
+                        else if (stage.status === 'done') color = '#34D399';
+                        if (stage.status === 'error') color = '#F87171'; // red
+                        const prefix = stage.status === 'active' ? '⟳ ' : stage.status === 'done' ? '✓ ' : stage.status === 'error' ? '✗ ' : '○ ';
                         return (
-                          <div key={idx} style={{ color, marginBottom: '4px' }}>
-                            {log}
+                          <div key={idx} style={{ color, marginBottom: '4px', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                            <span style={{ flexShrink: 0 }}>{prefix}</span>
+                            <span className={stage.status === 'active' ? 'animate-pulse' : ''}>{stage.text}</span>
                           </div>
                         );
                       })}
-                      {isUploading && telemetryLogs.length < 9 && (
-                        <div className="animate-pulse" style={{ color: '#34D399' }}>_</div>
+                      {isUploading && (
+                        <div className="animate-pulse" style={{ color: '#60A5FA', marginTop: '4px' }}>_</div>
                       )}
                     </div>
                   ) : (
