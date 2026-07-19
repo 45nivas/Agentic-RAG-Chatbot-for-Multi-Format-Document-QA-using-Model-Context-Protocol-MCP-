@@ -26,16 +26,18 @@ _local_pipeline = None
 from .locks import _local_pipeline_lock
 
 _ollama_lock = threading.Lock()
-_ollama_checked = False
+_ollama_last_checked = 0.0
 _ollama_available_models = None
+OLLAMA_CACHE_TTL_SECONDS = 60.0
 
 def get_installed_ollama_models() -> List[str]:
-    global _ollama_available_models, _ollama_checked
+    global _ollama_available_models, _ollama_last_checked
     with _ollama_lock:
-        if _ollama_checked:
-            return _ollama_available_models or []
+        current_time = time.time()
+        if _ollama_available_models is not None and (current_time - _ollama_last_checked) <= OLLAMA_CACHE_TTL_SECONDS:
+            return _ollama_available_models
             
-        _ollama_checked = True
+        _ollama_last_checked = current_time
         try:
             logger.info("🔍 Checking installed local Ollama models...")
             r = requests.get("http://localhost:11434/api/tags", timeout=1.5)

@@ -143,3 +143,53 @@ def test_clinical_grounding_flag():
     
     assert result2["reduced_clinical_grounding"] is False
     assert result2["clinical_grounding_explanation"] is None
+
+
+def test_ollama_cache_ttl():
+    """Verify that get_installed_ollama_models caches failures but recovers after TTL expires"""
+    import agents.llm_response_agent
+    import requests
+    from unittest.mock import patch, MagicMock
+    from agents.llm_response_agent import get_installed_ollama_models
+
+    # Reset the global cached state to ensure a clean starting point
+    agents.llm_response_agent._ollama_last_checked = 0.0
+    agents.llm_response_agent._ollama_available_models = None
+
+    start_time = 1000.0
+
+    with patch('time.time', return_value=start_time):
+        # 1. Simulating Ollama being unreachable (raises exception)
+        with patch('requests.get', side_effect=requests.exceptions.ConnectionError("Connection refused")):
+            models = get_installed_ollama_models()
+            assert models == []
+            assert agents.llm_response_agent._ollama_available_models == []
+            assert agents.llm_response_agent._ollama_last_checked == start_time
+
+        # 2. Query again within TTL (should return cached [] without calling requests.get)
+        with patch('requests.get') as mock_get:
+            # Advance time slightly (less than 60s TTL)
+            with patch('time.time', return_value=start_time + 30.0):
+                models = get_installed_ollama_models()
+                assert models == []
+                mock_get.assert_not_called()
+
+        # 3. Query after TTL has expired (should recheck and succeed)
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "models": [
+                {"name": "qwen2.5:1.5b"},
+                {"name": "qwen2.5:3b"}
+            ]
+        }
+
+        # Advance time past 60s TTL
+        with patch('time.time', return_value=start_time + 75.0):
+            with patch('requests.get', return_value=mock_response) as mock_get:
+                models = get_installed_ollama_models()
+                assert models == ["qwen2.5:1.5b", "qwen2.5:3b"]
+                assert agents.llm_response_agent._ollama_available_models == ["qwen2.5:1.5b", "qwen2.5:3b"]
+                assert agents.llm_response_agent._ollama_last_checked == start_time + 75.0
+                mock_get.assert_called_once_with("http://localhost:11434/api/tags", timeout=1.5)
+
